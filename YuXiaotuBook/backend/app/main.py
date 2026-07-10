@@ -6,8 +6,10 @@ from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.static_files import CachedStaticFiles
+from app.services.home_page_video_service import home_page_dir
 
 from app.api.v1 import api_router
+from app.api.v1.media import router as media_router
 from app.core.config import settings
 from app.core.openapi import setup_openapi
 from app.core.response import success
@@ -46,6 +48,13 @@ def create_app() -> FastAPI:
 
     os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
     os.makedirs(PLACEHOLDERS_DIR, exist_ok=True)
+    os.makedirs(home_page_dir(), exist_ok=True)
+    # homePage 需优先挂载（本地可能指向 网站素材/首页展览素材，不在 UPLOAD_DIR 下）
+    app.mount(
+        "/uploads/homePage",
+        CachedStaticFiles(directory=home_page_dir()),
+        name="home-page-uploads",
+    )
     app.mount("/uploads", CachedStaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
     app.mount(
         "/placeholders",
@@ -53,6 +62,7 @@ def create_app() -> FastAPI:
         name="placeholders",
     )
     app.include_router(api_router, prefix="/api/v1")
+    app.include_router(media_router, prefix="/media")
     setup_openapi(app)
 
     @app.on_event("startup")

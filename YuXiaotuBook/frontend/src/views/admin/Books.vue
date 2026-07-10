@@ -36,8 +36,8 @@ async function load() {
     request<any[]>({ url: '/admin/books' }),
     request({ url: '/admin/categories' }),
   ])
-  if (b.code === 200) books.value = b.data
-  if (c.code === 200) categories.value = c.data
+  if (b.code === 200) books.value = b.data ?? []
+  if (c.code === 200) categories.value = (c.data as any[]) ?? []
 }
 
 function openCreate() {

@@ -7,6 +7,8 @@ import com.yuxiaotu.trade.entity.OrderItemEntity;
 import com.yuxiaotu.trade.mapper.OrderItemMapper;
 import org.springframework.stereotype.Component;
 
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
@@ -15,7 +17,9 @@ import java.util.stream.Collectors;
 
 @Component
 public class OrderViewHelper {
-    private static final DateTimeFormatter ISO = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
+    private static final ZoneId BEIJING = ZoneId.of("Asia/Shanghai");
+    private static final DateTimeFormatter BEIJING_FMT =
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private static final Map<String, String> STATUS_LABELS = Map.of(
             "pending_payment", "待支付",
@@ -61,7 +65,13 @@ public class OrderViewHelper {
         return vo;
     }
 
+    /** DB 存 UTC naive，输出北京时间字符串 */
     private String format(java.time.LocalDateTime time) {
-        return time == null ? null : time.format(ISO);
+        if (time == null) {
+            return null;
+        }
+        return time.atZone(ZoneOffset.UTC)
+                .withZoneSameInstant(BEIJING)
+                .format(BEIJING_FMT);
     }
 }

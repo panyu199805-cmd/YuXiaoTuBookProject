@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { request } from '@/api/client'
+import { formatBeijingTime } from '@/utils/datetime'
 
 const orders = ref<any[]>([])
 const total = ref(0)
@@ -61,8 +62,7 @@ const statusOptions = [
 ]
 
 function formatTime(value?: string | null) {
-  if (!value) return '—'
-  return value.replace('T', ' ').slice(0, 19)
+  return formatBeijingTime(value)
 }
 
 function formatAmount(value?: number | null) {

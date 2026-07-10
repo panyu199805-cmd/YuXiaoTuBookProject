@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { protectVideoUrl } from '@/utils/video'
 
 const props = withDefaults(
   defineProps<{
@@ -20,71 +21,18 @@ const emit = defineEmits<{
   error: []
 }>()
 
-const wrapRef = ref<HTMLElement | null>(null)
-const canvasRef = ref<HTMLCanvasElement | null>(null)
 const videoRef = ref<HTMLVideoElement | null>(null)
 
-let rafId = 0
-let resizeObs: ResizeObserver | null = null
-
-function resizeCanvas() {
-  const wrap = wrapRef.value
-  const canvas = canvasRef.value
-  if (!wrap || !canvas) return
-  const { width, height } = wrap.getBoundingClientRect()
-  const dpr = window.devicePixelRatio || 1
-  canvas.width = Math.max(1, Math.floor(width * dpr))
-  canvas.height = Math.max(1, Math.floor(height * dpr))
-  canvas.style.width = `${width}px`
-  canvas.style.height = `${height}px`
-  paintFrame()
-}
-
-function paintFrame() {
-  const video = videoRef.value
-  const canvas = canvasRef.value
-  if (!video || !canvas) return
-  const ctx = canvas.getContext('2d')
-  if (!ctx || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return
-
-  const vw = video.videoWidth
-  const vh = video.videoHeight
-  const cw = canvas.width
-  const ch = canvas.height
-  if (!vw || !vh) return
-
-  const scale = Math.max(cw / vw, ch / vh)
-  const drawW = vw * scale
-  const drawH = vh * scale
-  const offsetX = (cw - drawW) / 2
-  const offsetY = (ch - drawH) / 2
-
-  ctx.clearRect(0, 0, cw, ch)
-  ctx.drawImage(video, offsetX, offsetY, drawW, drawH)
-}
-
-function startLoop() {
-  cancelAnimationFrame(rafId)
-  const tick = () => {
-    paintFrame()
-    const video = videoRef.value
-    if (video && !video.paused && !video.ended) {
-      rafId = requestAnimationFrame(tick)
-    }
-  }
-  rafId = requestAnimationFrame(tick)
-}
-
-function stopLoop() {
-  cancelAnimationFrame(rafId)
-}
+const playbackSrc = computed(() => protectVideoUrl(props.src))
 
 async function playVideo() {
   const video = videoRef.value
-  if (!video) return
+  if (!video || !playbackSrc.value) return
   try {
+    if (video.readyState < HTMLMediaElement.HAVE_FUTURE_DATA) {
+      video.load()
+    }
     await video.play()
-    startLoop()
   } catch {
     /* ignore autoplay block */
   }
@@ -92,14 +40,21 @@ async function playVideo() {
 
 function pauseVideo() {
   videoRef.value?.pause()
-  stopLoop()
+}
+
+function prepareBuffer() {
+  const video = videoRef.value
+  if (!video || !playbackSrc.value) return
+  if (video.readyState < HTMLMediaElement.HAVE_METADATA) {
+    video.load()
+  }
 }
 
 watch(
-  () => props.src,
-  () => {
-    stopLoop()
-    videoRef.value?.load()
+  () => playbackSrc.value,
+  (url) => {
+    if (!url) return
+    prepareBuffer()
   },
 )
 
@@ -107,39 +62,33 @@ watch(
   () => props.active,
   (active) => {
     if (active) void playVideo()
+    else pauseVideo()
   },
 )
 
 onMounted(() => {
-  resizeCanvas()
-  resizeObs = new ResizeObserver(resizeCanvas)
-  if (wrapRef.value) resizeObs.observe(wrapRef.value)
+  prepareBuffer()
   if (props.active) void playVideo()
 })
 
 onUnmounted(() => {
-  stopLoop()
-  resizeObs?.disconnect()
+  pauseVideo()
 })
 
 defineExpose({
   get el() {
     return videoRef.value
   },
+  prepareBuffer,
 })
 </script>
 
 <template>
-  <div
-    ref="wrapRef"
-    class="hero-video-layer"
-    :class="{ 'hero-video-layer--active': active }"
-  >
-    <canvas ref="canvasRef" class="hero-video-canvas" aria-hidden="true" />
+  <div class="hero-video-layer" :class="{ 'hero-video-layer--active': active }">
     <video
       ref="videoRef"
-      class="hero-video-source"
-      :src="src || undefined"
+      class="hero-video"
+      :src="playbackSrc || undefined"
       :loop="loop"
       muted
       playsinline
@@ -148,15 +97,15 @@ defineExpose({
       disableremoteplayback
       controlslist="nodownload noremoteplayback nofullscreen"
       x-webkit-airplay="deny"
+      referrerpolicy="no-referrer"
       preload="auto"
       tabindex="-1"
       aria-hidden="true"
       @loadeddata="emit('loadeddata')"
       @ended="emit('ended')"
       @error="emit('error')"
-      @play="startLoop"
-      @pause="stopLoop"
     />
+    <div class="video-download-shield" aria-hidden="true" @contextmenu.prevent />
   </div>
 </template>
 
@@ -169,6 +118,8 @@ defineExpose({
   transition: opacity 1.2s ease-in-out;
   will-change: opacity;
   pointer-events: none;
+  overflow: hidden;
+  background: #0a1628;
 }
 
 .hero-video-layer--active {
@@ -176,22 +127,12 @@ defineExpose({
   z-index: 1;
 }
 
-.hero-video-canvas {
-  display: block;
+.hero-video {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  filter: brightness(1.06) saturate(1.08);
-}
-
-.hero-video-source {
-  position: fixed;
-  left: -9999px;
-  top: -9999px;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-  pointer-events: none;
-  visibility: hidden;
+  display: block;
+  transform: translateZ(0);
+  backface-visibility: hidden;
 }
 </style>

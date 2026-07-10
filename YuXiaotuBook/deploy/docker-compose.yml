@@ -46,17 +46,22 @@ services:
       - ../backend/uploads:/app/uploads
       - ../backend/app/main.py:/app/app/main.py:ro
       - ../backend/app/api/v1/admin.py:/app/app/api/v1/admin.py:ro
+      - ../backend/app/api/v1/media.py:/app/app/api/v1/media.py:ro
       - ../backend/app/api/v1/favorites.py:/app/app/api/v1/favorites.py:ro
       - ../backend/app/api/v1/home.py:/app/app/api/v1/home.py:ro
       - ../backend/app/api/v1/books.py:/app/app/api/v1/books.py:ro
       - ../backend/app/models/site.py:/app/app/models/site.py:ro
       - ../backend/app/models/order.py:/app/app/models/order.py:ro
+      - ../backend/app/core/config.py:/app/app/core/config.py:ro
       - ../backend/app/core/static_files.py:/app/app/core/static_files.py:ro
       - ../backend/app/schemas/requests.py:/app/app/schemas/requests.py:ro
       - ../backend/app/services/site_config_helpers.py:/app/app/services/site_config_helpers.py:ro
       - ../backend/app/services/analytics_service.py:/app/app/services/analytics_service.py:ro
+      - ../backend/app/services/home_page_video_service.py:/app/app/services/home_page_video_service.py:ro
+      - ../backend/app/services/video_url_service.py:/app/app/services/video_url_service.py:ro
       - ../backend/app/services/book_service.py:/app/app/services/book_service.py:ro
       - ../backend/app/services/order_helpers.py:/app/app/services/order_helpers.py:ro
+      - ../backend/app/utils:/app/app/utils:ro
       - ../backend/app/services/order_service.py:/app/app/services/order_service.py:ro
       - ../backend/app/services/collect_service.py:/app/app/services/collect_service.py:ro
       - ../backend/app/services/member_service.py:/app/app/services/member_service.py:ro

@@ -30,6 +30,10 @@ REVENUE_STATUSES = ("paid", "shipped", "completed")
 _PROCESS_START = time.time()
 
 
+def _naive_dt(value: datetime) -> datetime:
+    return value.replace(tzinfo=None) if value.tzinfo is not None else value
+
+
 def _day_bounds(day: date) -> tuple[datetime, datetime]:
     start = datetime.combine(day, dt_time.min)
     end = datetime.combine(day, dt_time.max)
@@ -72,7 +76,7 @@ async def build_overview_stats() -> Dict[str, Any]:
         sum(
             order.total_amount
             for order in paid_orders
-            if order.pay_time and order.pay_time >= today_start
+            if order.pay_time and _naive_dt(order.pay_time) >= today_start
         )
     )
 
@@ -83,7 +87,7 @@ async def build_overview_stats() -> Dict[str, Any]:
         sum(
             order.amount
             for order in member_paid_orders
-            if order.pay_time and order.pay_time >= today_start
+            if order.pay_time and _naive_dt(order.pay_time) >= today_start
         )
     )
 
@@ -156,7 +160,7 @@ async def build_overview_stats() -> Dict[str, Any]:
                 "total_amount": float(order.total_amount),
                 "status": order.status,
                 "status_label": STATUS_LABELS.get(order.status, order.status),
-                "created_at": order.created_at.isoformat() if order.created_at else None,
+                "created_at": to_beijing_str(order.created_at),
                 "book_summary": summarize_book_names(items),
             }
         )

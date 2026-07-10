@@ -104,7 +104,7 @@ async function submitOrder() {
 
   submitting.value = true
   try {
-    const res = await request({
+    const res = await request<{ id: number }>({
       url: '/orders',
       method: 'POST',
       data: {

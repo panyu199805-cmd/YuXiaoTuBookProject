@@ -1,7 +1,7 @@
-from __future__ import annotations
-
 from datetime import datetime
 from typing import Any, Dict
+
+from app.utils.timezone import to_beijing_str
 
 from app.models import MemberPackage, MemberOrder, UserMember
 
@@ -50,6 +50,6 @@ def member_order_to_dict(order: MemberOrder) -> Dict[str, Any]:
         "amount": order.amount,
         "status": order.status,
         "pay_channel": order.pay_channel,
-        "pay_time": order.pay_time.isoformat() if order.pay_time else None,
-        "created_at": order.created_at.isoformat() if order.created_at else None,
+        "pay_time": to_beijing_str(order.pay_time),
+        "created_at": to_beijing_str(order.created_at),
     }

@@ -25,6 +25,8 @@ class Settings:
     ]
     DEBUG: bool = os.getenv("DEBUG", "true").lower() == "true"
     UPLOAD_DIR: str = os.getenv("UPLOAD_DIR", os.path.join(os.getcwd(), "uploads"))
+    # 留空则自动：本地用 网站素材/首页展览素材，生产用 UPLOAD_DIR/homePage
+    HOME_PAGE_VIDEO_DIR: str = os.getenv("HOME_PAGE_VIDEO_DIR", "")
 
 
 settings = Settings()

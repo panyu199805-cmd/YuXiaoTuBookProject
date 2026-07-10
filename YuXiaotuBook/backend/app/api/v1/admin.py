@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 import uuid
-from typing import Optional
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, File, UploadFile
 
@@ -47,6 +47,19 @@ from app.services.order_helpers import (
     summarize_book_names,
 )
 from app.services.order_service import OrderService
+from app.services.home_page_video_service import (
+    HOME_PAGE_URL_PREFIX,
+    clear_home_page_videos,
+    delete_home_page_video,
+    home_page_dir,
+    is_home_page_video_url,
+    list_home_page_video_urls,
+    merge_bg_videos_with_folder,
+    normalize_home_page_url,
+    purge_home_page_videos,
+    save_home_page_video,
+    url_to_path,
+)
 from app.services.site_config_helpers import (
     MAX_BG_VIDEOS,
     normalize_bg_videos,
@@ -80,6 +93,7 @@ IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp"}
 VIDEO_EXTS = {".mp4", ".webm"}
 MAX_IMAGE_SIZE = 5 * 1024 * 1024
 MAX_VIDEO_SIZE = 50 * 1024 * 1024
+MAX_HOME_PAGE_VIDEO_SIZE = 100 * 1024 * 1024
 
 
 @upload_router.post("/upload", summary="上传图片或视频")
@@ -107,6 +121,45 @@ async def upload_file(
         f.write(content)
     url = f"/uploads/{name}"
     return success({"url": url, "media_type": media_type})
+
+
+@upload_router.post("/home-page-videos/upload", summary="上传首页背景视频到 homePage 目录")
+async def upload_home_page_video(
+    file: UploadFile = File(...),
+    user: User = Depends(get_admin_user),
+):
+    ext = os.path.splitext(file.filename or "")[1].lower()
+    if ext not in VIDEO_EXTS:
+        return fail("首页背景仅支持 mp4/webm", 400)
+    content = await file.read()
+    if len(content) > MAX_HOME_PAGE_VIDEO_SIZE:
+        return fail("视频不能超过100MB", 400)
+    url = save_home_page_video(file.filename or "video.mp4", content)
+    return success({"url": url, "media_type": "video"})
+
+
+@upload_router.delete("/home-page-videos", summary="删除 homePage 目录中的背景视频")
+async def delete_home_page_video_file(
+    url: str,
+    user: User = Depends(get_admin_user),
+):
+    if not is_home_page_video_url(url):
+        return fail(f"仅允许删除 {HOME_PAGE_URL_PREFIX}/ 下的视频", 400)
+    if not url_to_path(url):
+        return fail("无效的视频路径", 400)
+    if not delete_home_page_video(url):
+        return fail("视频不存在或已删除", 404)
+    return success(None, "已删除")
+
+
+@upload_router.get("/home-page-videos", summary="列出 homePage 目录中的背景视频")
+async def list_home_page_videos(user: User = Depends(get_admin_user)):
+    return success(
+        {
+            "storage_dir": home_page_dir(),
+            "urls": list_home_page_video_urls(),
+        }
+    )
 
 
 @books_router.get("/books", summary="书籍列表")
@@ -327,24 +380,49 @@ async def admin_save_site_config(
     body: SiteConfigRequest, user: User = Depends(get_admin_user)
 ):
     payload = body.model_dump()
-    bg_videos = normalize_bg_videos(payload.get("bg_videos"))
-    if len(bg_videos) > MAX_BG_VIDEOS:
+    requested = normalize_bg_videos(payload.get("bg_videos"))
+    if len(requested) > MAX_BG_VIDEOS:
         return fail(f"背景视频最多 {MAX_BG_VIDEOS} 个", 400)
-    payload["bg_videos"] = bg_videos or None
-    if bg_videos:
-        payload["bg_type"] = "video"
-        payload["bg_url"] = bg_videos[0]
-    elif payload.get("bg_type") == "video" and not payload.get("bg_url"):
-        payload["bg_type"] = "image"
 
     cfg = await SiteConfig.all().order_by("-id").first()
+
+    if not requested:
+        removed = clear_home_page_videos()
+        bg_videos: List[str] = []
+        payload["bg_videos"] = None
+        payload["bg_url"] = ""
+        payload["bg_type"] = "image"
+        payload["bg_enabled"] = False
+    else:
+        bg_videos = []
+        for url in requested:
+            if not is_home_page_video_url(url):
+                continue
+            path = url_to_path(url)
+            if path and os.path.isfile(path):
+                bg_videos.append(normalize_home_page_url(url))
+        if len(bg_videos) > MAX_BG_VIDEOS:
+            return fail(f"背景视频最多 {MAX_BG_VIDEOS} 个", 400)
+        removed = purge_home_page_videos(bg_videos)
+        payload["bg_videos"] = bg_videos or None
+        if bg_videos:
+            payload["bg_type"] = "video"
+            payload["bg_url"] = bg_videos[0]
+            payload["bg_enabled"] = True
+        else:
+            payload["bg_url"] = ""
+            payload["bg_type"] = "image"
+            payload["bg_enabled"] = False
+
     if cfg:
         for k, v in payload.items():
             setattr(cfg, k, v)
         await cfg.save()
     else:
         cfg = await SiteConfig.create(**payload)
-    return success({"id": cfg.id})
+    data = site_config_to_dict(cfg)
+    data["purged_videos"] = removed
+    return success(data)
 
 
 @daily_router.get("/daily", summary="每日读书列表")

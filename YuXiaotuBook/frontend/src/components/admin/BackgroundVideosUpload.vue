@@ -1,20 +1,38 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { UploadRequestOptions } from 'element-plus'
-import { uploadAdminFile } from '@/utils/adminUpload'
+import { request } from '@/api/client'
+import { uploadHomePageVideo, deleteHomePageVideo } from '@/utils/adminUpload'
 import { resolveMediaUrl } from '@/utils/media'
+import { protectVideoUrl } from '@/utils/video'
 
 const MAX_VIDEOS = 6
 
 const videos = defineModel<string[]>({ default: () => [] })
 
 const uploading = ref(false)
+const storageDir = ref('')
 
 const canAddMore = computed(() => videos.value.length < MAX_VIDEOS)
 
+async function loadStorageInfo() {
+  try {
+    const res = await request<{ storage_dir?: string; urls?: string[] }>({
+      url: '/admin/home-page-videos',
+    })
+    if (res.code === 200 && res.data) {
+      storageDir.value = res.data.storage_dir || ''
+    }
+  } catch {
+    // ignore
+  }
+}
+
+onMounted(loadStorageInfo)
+
 function displayUrl(url: string) {
-  return resolveMediaUrl(url)
+  return protectVideoUrl(resolveMediaUrl(url))
 }
 
 async function handleUpload(options: UploadRequestOptions) {
@@ -26,13 +44,14 @@ async function handleUpload(options: UploadRequestOptions) {
 
   uploading.value = true
   try {
-    const data = await uploadAdminFile(options.file)
+    const data = await uploadHomePageVideo(options.file)
     if (data.media_type !== 'video') {
       ElMessage.warning('首页背景仅支持视频，请上传 MP4/WebM')
       options.onError?.(new Error('not video') as never)
       return
     }
     videos.value = [...videos.value, data.url]
+    await loadStorageInfo()
     ElMessage.success(`已添加背景视频（${videos.value.length}/${MAX_VIDEOS}）`)
     options.onSuccess?.(data)
   } catch (err) {
@@ -49,15 +68,37 @@ function beforeUpload(file: File) {
     ElMessage.warning('仅支持视频 MP4/WebM')
     return false
   }
-  if (file.size > 50 * 1024 * 1024) {
-    ElMessage.warning('视频大小不能超过 50MB')
+  if (file.size > 100 * 1024 * 1024) {
+    ElMessage.warning('视频大小不能超过 100MB')
     return false
   }
   return true
 }
 
-function removeVideo(index: number) {
-  videos.value = videos.value.filter((_, i) => i !== index)
+function homePageDeleteUrl(url: string): string | null {
+  if (url.startsWith('/uploads/homePage/')) return url
+  const name = url.split('/').filter(Boolean).pop()
+  if (name && /\.(mp4|webm)$/i.test(name)) {
+    return `/uploads/homePage/${name}`
+  }
+  return null
+}
+
+async function removeVideo(index: number) {
+  const url = videos.value[index]
+  if (!url) return
+  try {
+    const deleteUrl = homePageDeleteUrl(url)
+    if (deleteUrl) {
+      await deleteHomePageVideo(deleteUrl)
+    }
+    videos.value = videos.value.filter((_, i) => i !== index)
+    await loadStorageInfo()
+    ElMessage.success('已删除背景视频')
+  } catch (err) {
+    const message = err instanceof Error ? err.message : '删除失败'
+    ElMessage.error(message)
+  }
 }
 
 function moveVideo(index: number, delta: number) {
@@ -71,12 +112,27 @@ function moveVideo(index: number, delta: number) {
 
 <template>
   <div class="bg-videos">
-    <p class="tip">最多添加 {{ MAX_VIDEOS }} 个视频，首页将按顺序完整播放后自动切换下一个。</p>
+    <p class="tip">
+      视频与磁盘目录实时同步：上传/删除会立即写入存储目录。保存时不在列表中的文件会被清理。
+    </p>
+    <p v-if="storageDir" class="storage-dir">存储目录：{{ storageDir }}</p>
 
     <div v-if="videos.length" class="video-list">
       <div v-for="(url, index) in videos" :key="`${url}-${index}`" class="video-item">
         <div class="video-preview-wrap">
-          <video :src="displayUrl(url)" class="video-preview" controls muted playsinline />
+          <video
+            :src="displayUrl(url)"
+            class="video-preview"
+            muted
+            playsinline
+            preload="metadata"
+            disablepictureinpicture
+            disableremoteplayback
+            controlslist="nodownload noremoteplayback"
+            referrerpolicy="no-referrer"
+            @contextmenu.prevent
+          />
+          <div class="video-download-shield" aria-hidden="true" @contextmenu.prevent />
           <span class="video-index">视频 {{ index + 1 }}</span>
         </div>
         <div class="video-actions">
@@ -110,7 +166,7 @@ function moveVideo(index: number, delta: number) {
         <span class="text">
           {{ uploading ? '上传中…' : `添加背景视频（${videos.length}/${MAX_VIDEOS}）` }}
         </span>
-        <span class="hint">MP4/WebM，单个不超过 50MB</span>
+        <span class="hint">MP4/WebM，单个不超过 100MB，保存至 homePage 目录</span>
       </div>
     </el-upload>
 
@@ -124,10 +180,17 @@ function moveVideo(index: number, delta: number) {
 }
 
 .tip {
-  margin: 0 0 12px;
+  margin: 0 0 8px;
   font-size: 13px;
   color: var(--el-text-color-secondary);
   line-height: 1.6;
+}
+
+.storage-dir {
+  margin: 0 0 12px;
+  font-size: 12px;
+  color: var(--el-text-color-placeholder);
+  word-break: break-all;
 }
 
 .video-list {

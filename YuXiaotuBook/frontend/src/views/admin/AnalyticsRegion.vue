@@ -30,6 +30,10 @@ onMounted(async () => {
     loading.value = false
   }
 })
+
+function formatTopCategories(categories: { name: string; count: number }[]) {
+  return categories.map((c) => `${c.name}(${c.count})`).join('、')
+}
 </script>
 
 <template>
@@ -83,7 +87,7 @@ onMounted(async () => {
           <el-table-column label="偏好分类" min-width="180">
             <template #default="{ row }">
               <span v-if="row.top_categories.length">
-                {{ row.top_categories.map((c: { name: string; count: number }) => `${c.name}(${c.count})`).join('、') }}
+                {{ formatTopCategories(row.top_categories) }}
               </span>
               <span v-else>—</span>
             </template>

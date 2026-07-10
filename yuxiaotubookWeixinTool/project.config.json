@@ -1,0 +1,13 @@
+{
+  "description": "WeChat DevTools: import dist/build/mp-weixin OR this root folder",
+  "miniprogramRoot": "dist/dev/mp-weixin",
+  "compileType": "miniprogram",
+  "setting": {
+    "urlCheck": false,
+    "es6": true,
+    "minified": false
+  },
+  "appid": "wxf39ace51d4611d39",
+  "projectname": "yuxiaotubook-weixin",
+  "condition": {}
+}

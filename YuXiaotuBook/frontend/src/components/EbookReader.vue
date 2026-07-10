@@ -318,7 +318,7 @@ watch(expanded, (open) => {
             {{ item.text }}
           </p>
         </article>
-        <footer class="ebook-footer">
+        <footer v-if="!isFullscreen" class="ebook-footer">
           <span>— 全文完 —</span>
           <button type="button" class="ebook-close-bottom" @click="expanded = false">收起阅读</button>
         </footer>

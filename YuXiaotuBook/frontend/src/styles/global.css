@@ -67,6 +67,21 @@ video::-webkit-media-controls-enclosure {
 }
 
 video::-webkit-media-controls-overlay-play-button,
-video::-webkit-media-controls-start-playback-button {
-  display: none;
+video::-webkit-media-controls-start-playback-button,
+video::-webkit-media-controls-download-button,
+video::-internal-media-controls-download-button {
+  display: none !important;
+  -webkit-appearance: none;
+}
+
+/* 遮挡部分浏览器/插件在左上角注入的「高速下载」按钮 */
+.video-download-shield {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 6;
+  width: 180px;
+  height: 56px;
+  pointer-events: auto;
+  background: transparent;
 }

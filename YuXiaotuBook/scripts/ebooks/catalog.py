@@ -17,7 +17,9 @@ BOOK_EBOOK_TITLES: dict[str, str] = {
     "我们仨": "读懂《我们仨》：一家人，最无悔的相守",
 }
 
-DEFAULT_VIDEO_URL = "https://www.w3schools.com/html/mov_bbb.mp4"
+from book_video_asset import BOOK_INTRO_VIDEO_URL
+
+DEFAULT_VIDEO_URL = BOOK_INTRO_VIDEO_URL
 
 
 def ebook_content_for(title: str) -> str:

@@ -1,0 +1,111 @@
+{
+  "pages": [
+    {
+      "path": "pages/index/index",
+      "style": {
+        "navigationStyle": "custom",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/books/list",
+      "style": {
+        "navigationBarTitleText": "书单",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/books/detail",
+      "style": {
+        "navigationBarTitleText": "书籍详情"
+      }
+    },
+    {
+      "path": "pages/daily/index",
+      "style": {
+        "navigationBarTitleText": "每日读书",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/member/index",
+      "style": {
+        "navigationBarTitleText": "会员中心"
+      }
+    },
+    {
+      "path": "pages/auth/login",
+      "style": {
+        "navigationBarTitleText": "登录"
+      }
+    },
+    {
+      "path": "pages/auth/register",
+      "style": {
+        "navigationBarTitleText": "注册"
+      }
+    },
+    {
+      "path": "pages/user/center",
+      "style": {
+        "navigationBarTitleText": "我的"
+      }
+    },
+    {
+      "path": "pages/user/orders",
+      "style": {
+        "navigationBarTitleText": "我的订单"
+      }
+    },
+    {
+      "path": "pages/user/favorites",
+      "style": {
+        "navigationBarTitleText": "我的收藏"
+      }
+    },
+    {
+      "path": "pages/user/history",
+      "style": {
+        "navigationBarTitleText": "浏览记录"
+      }
+    }
+  ],
+  "tabBar": {
+    "color": "#666666",
+    "selectedColor": "#5b9aa0",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/index/index",
+        "text": "首页",
+        "iconPath": "static/tab-home.png",
+        "selectedIconPath": "static/tab-home-active.png"
+      },
+      {
+        "pagePath": "pages/books/list",
+        "text": "书单",
+        "iconPath": "static/tab-books.png",
+        "selectedIconPath": "static/tab-books-active.png"
+      },
+      {
+        "pagePath": "pages/daily/index",
+        "text": "每日",
+        "iconPath": "static/tab-daily.png",
+        "selectedIconPath": "static/tab-daily-active.png"
+      },
+      {
+        "pagePath": "pages/user/center",
+        "text": "我的",
+        "iconPath": "static/tab-user.png",
+        "selectedIconPath": "static/tab-user-active.png"
+      }
+    ]
+  },
+  "globalStyle": {
+    "navigationBarTextStyle": "black",
+    "navigationBarTitleText": "宇小兔读书",
+    "navigationBarBackgroundColor": "#ffffff",
+    "backgroundColor": "#f7f8fa"
+  }
+}

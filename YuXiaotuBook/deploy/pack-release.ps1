@@ -58,6 +58,35 @@ foreach ($item in $CopyItems) {
 }
 robocopy $TradeDir (Join-Path $TempDir "yuxiaotu-trade-service") /E /XD target .git /NFL /NDL /NJH /NJS /nc /ns /np | Out-Null
 
+$ExhibitionSrc = $null
+$BookReviewSrc = $null
+$assetJson = & (Join-Path $RepoRoot 'YuXiaotuBook\backend\.venv\Scripts\python.exe') (Join-Path $RepoRoot 'YuXiaotuBook\scripts\get_asset_dirs.py') 2>$null
+if (-not $assetJson) {
+    $assetJson = & py -3 (Join-Path $RepoRoot 'YuXiaotuBook\scripts\get_asset_dirs.py') 2>$null
+}
+if ($assetJson) {
+    $assetDirs = $assetJson | ConvertFrom-Json
+    $ExhibitionSrc = $assetDirs.home_exhibition
+    $BookReviewSrc = $assetDirs.book_review
+}
+$ExhibitionDst = Join-Path $TempDir "YuXiaotuBook\backend\uploads\homePage"
+if (Test-Path -LiteralPath $ExhibitionSrc) {
+    Write-Host "[pack] copying home exhibition videos..." -ForegroundColor Cyan
+    New-Item -ItemType Directory -Path $ExhibitionDst -Force | Out-Null
+    Copy-Item -Path (Join-Path $ExhibitionSrc "*.mp4") -Destination $ExhibitionDst -Force
+} else {
+    Write-Host "[pack] warning: exhibition source not found: $ExhibitionSrc" -ForegroundColor Yellow
+}
+
+$BookReviewDst = Join-Path $TempDir "YuXiaotuBook\backend\uploads\bookReview"
+if ($BookReviewSrc -and (Test-Path -LiteralPath $BookReviewSrc)) {
+    Write-Host "[pack] copying book review videos..." -ForegroundColor Cyan
+    New-Item -ItemType Directory -Path $BookReviewDst -Force | Out-Null
+    Copy-Item -Path (Join-Path $BookReviewSrc "*.mp4") -Destination $BookReviewDst -Force
+} else {
+    Write-Host "[pack] warning: book review source not found: $BookReviewSrc" -ForegroundColor Yellow
+}
+
 # Windows 打包的 .sh 默认 CRLF 且无 +x，Linux 上 ./xxx.sh 会报 command not found
 Write-Host "[pack] normalizing shell scripts (LF + executable)..." -ForegroundColor Cyan
 Get-ChildItem -Path $TempDir -Recurse -Filter *.sh -File | ForEach-Object {

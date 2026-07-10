@@ -28,7 +28,10 @@ const currentVideoIndex = ref(0)
 const isTransitioning = ref(false)
 
 const CROSSFADE_MS = 1200
+const PRELOAD_DELAY_MS = 1500
+const CANPLAY_TIMEOUT_MS = 12000
 let crossfadeTimer: ReturnType<typeof setTimeout> | null = null
+let preloadTimer: ReturnType<typeof setTimeout> | null = null
 let advanceToken = 0
 
 function bumpAdvanceToken() {
@@ -107,11 +110,24 @@ function onNavZoneEnter() {
   revealNavArrows()
 }
 
-function waitCanPlay(video: HTMLVideoElement): Promise<void> {
+function waitCanPlay(video: HTMLVideoElement, timeoutMs = CANPLAY_TIMEOUT_MS): Promise<void> {
   if (video.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) return Promise.resolve()
   return new Promise((resolve) => {
-    video.addEventListener('canplay', () => resolve(), { once: true })
+    const timer = window.setTimeout(() => resolve(), timeoutMs)
+    const done = () => {
+      window.clearTimeout(timer)
+      resolve()
+    }
+    video.addEventListener('canplay', done, { once: true })
+    video.addEventListener('error', done, { once: true })
+    if (video.readyState === HTMLMediaElement.HAVE_NOTHING) {
+      video.load()
+    }
   })
+}
+
+function prepareVideoLayer(layer: number) {
+  videoLayerRefs.value[layer]?.prepareBuffer?.()
 }
 
 function setLayerSrc(layer: 0 | 1, url: string) {
@@ -135,28 +151,26 @@ function advanceToNextVideo() {
   void goToVideo(nextIndex)
 }
 
+function clearPreloadTimer() {
+  if (preloadTimer) {
+    clearTimeout(preloadTimer)
+    preloadTimer = null
+  }
+}
+
 function preloadAdjacentVideo() {
   const list = bgVideos.value
   if (list.length <= 1) return
-  const nextIdx = (currentVideoIndex.value + 1) % list.length
-  const backLayer = (1 - activeLayer.value) as 0 | 1
-  const nextUrl = list[nextIdx]
-  if (layerSrc.value[backLayer] !== nextUrl) {
-    setLayerSrc(backLayer, nextUrl)
-  }
-  const backEl = getVideoLayer(backLayer)
-  if (!backEl) return
-  backEl.pause()
-  backEl.currentTime = 0
-  if (backEl.readyState < HTMLMediaElement.HAVE_FUTURE_DATA) {
-    void backEl
-      .play()
-      .then(() => {
-        backEl.pause()
-        backEl.currentTime = 0
-      })
-      .catch(() => {})
-  }
+  clearPreloadTimer()
+  preloadTimer = setTimeout(() => {
+    preloadTimer = null
+    const nextIdx = (currentVideoIndex.value + 1) % list.length
+    const backLayer = (1 - activeLayer.value) as 0 | 1
+    const nextUrl = list[nextIdx]
+    if (layerSrc.value[backLayer] !== nextUrl) {
+      setLayerSrc(backLayer, nextUrl)
+    }
+  }, PRELOAD_DELAY_MS)
 }
 
 function resumeHeroVideo() {
@@ -208,6 +222,8 @@ async function goToVideo(nextIndex: number) {
   setLayerSrc(backLayer, list[normalized])
 
   await nextTick()
+  prepareVideoLayer(backLayer)
+  await nextTick()
   const backEl = getVideoLayer(backLayer)
   if (!backEl) {
     isTransitioning.value = false
@@ -253,7 +269,6 @@ function switchVideo(delta: number) {
   const list = bgVideos.value
   if (list.length <= 1) return
   revealNavArrows()
-  bumpAdvanceToken()
   if (crossfadeTimer) {
     clearTimeout(crossfadeTimer)
     crossfadeTimer = null
@@ -292,6 +307,7 @@ function clearHeroTimers() {
     clearTimeout(crossfadeTimer)
     crossfadeTimer = null
   }
+  clearPreloadTimer()
   bumpAdvanceToken()
   clearNavHideTimer()
 }
@@ -309,9 +325,9 @@ onDeactivated(() => {
 async function loadHomeData() {
   await siteStore.fetchConfig(true)
   const [feat, hot, cats] = await Promise.all([
-    request({ url: '/home/featured' }),
-    request({ url: '/home/hot-books', params: { page: 1, page_size: 12 } }),
-    request({ url: '/categories' }),
+    request<any>({ url: '/home/featured' }),
+    request<{ list?: any[]; total?: number }>({ url: '/home/hot-books', params: { page: 1, page_size: 12 } }),
+    request<any[]>({ url: '/categories' }),
   ])
   if (feat.code === 200) {
     featured.value = feat.data

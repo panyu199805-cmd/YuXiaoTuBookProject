@@ -1,9 +1,13 @@
 import { defineStore } from 'pinia'
 import { request } from '@/api/client'
 import { resolveMediaUrl } from '@/utils/media'
+import { protectVideoUrl } from '@/utils/video'
 
 function isVideoUrl(url?: string | null) {
-  return Boolean(url && /\.(mp4|webm)(\?.*)?$/i.test(url))
+  if (!url) return false
+  const path = url.split('?', 1)[0]
+  if (/^\/media\/v\/(homePage|bookReview)\//i.test(path)) return true
+  return /\.(mp4|webm)(\?.*)?$/i.test(url)
 }
 
 function parseBgVideos(config: Record<string, unknown> | null): string[] {
@@ -23,7 +27,8 @@ export const useSiteStore = defineStore('site', {
     loading: false,
   }),
   getters: {
-    bgVideos: (state): string[] => parseBgVideos(state.config).map((url) => resolveMediaUrl(url)),
+    bgVideos: (state): string[] =>
+      parseBgVideos(state.config).map((url) => protectVideoUrl(resolveMediaUrl(url))),
     useVideoBg: (state): boolean =>
       Boolean(state.config?.bg_enabled && parseBgVideos(state.config).length > 0),
   },

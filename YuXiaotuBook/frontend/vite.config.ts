@@ -17,6 +17,7 @@ export default defineConfig({
       '/api/v1/member': { target: 'http://127.0.0.1:8081', changeOrigin: true },
       '/api': { target: 'http://127.0.0.1:8000', changeOrigin: true },
       '/uploads': { target: 'http://127.0.0.1:8000', changeOrigin: true },
+      '/media': { target: 'http://127.0.0.1:8000', changeOrigin: true },
       '/placeholders': { target: 'http://127.0.0.1:8000', changeOrigin: true },
     },
   },

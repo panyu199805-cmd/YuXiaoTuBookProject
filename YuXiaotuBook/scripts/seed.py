@@ -20,6 +20,8 @@ from app.models import Book, BookVideo, Category, DailyBook, MemberPackage, Site
 
 sys.path.insert(0, os.path.dirname(__file__))
 from book_covers import TITLE_TO_COVER, cover_path_by_title
+from book_video_asset import BOOK_INTRO_VIDEO_URL, sync_book_review_to_uploads
+from site_video_asset import home_exhibition_upload_urls, sync_home_exhibition_to_uploads
 
 CATEGORIES = [
     ("成长", "growth", 1),
@@ -41,7 +43,7 @@ SAMPLE_BOOKS = [
         "summary": "阿德勒心理学入门，帮助你摆脱他人期待的束缚。",
         "highlight": "自由就是被别人讨厌",
         "target_audience": "焦虑职场人",
-        "video_url": "https://www.w3schools.com/html/mov_bbb.mp4",
+        "video_url": BOOK_INTRO_VIDEO_URL,
     },
     {
         "title": "小王子",
@@ -53,7 +55,7 @@ SAMPLE_BOOKS = [
         "summary": "一部写给大人的童话，关于爱与责任。",
         "highlight": "真正重要的东西，用眼睛是看不见的",
         "target_audience": "文艺爱好者",
-        "video_url": "https://www.w3schools.com/html/movie.mp4",
+        "video_url": BOOK_INTRO_VIDEO_URL,
     },
     {
         "title": "非暴力沟通",
@@ -65,7 +67,7 @@ SAMPLE_BOOKS = [
         "summary": "学会倾听与表达，改善人际关系。",
         "highlight": "言语背后的需要，才是沟通的关键",
         "target_audience": "职场人、伴侣",
-        "video_url": "https://www.w3schools.com/html/mov_bbb.mp4",
+        "video_url": BOOK_INTRO_VIDEO_URL,
     },
 ]
 
@@ -150,11 +152,16 @@ async def main() -> None:
         )
 
     if book_ids:
+        upload_root = os.path.join(BACKEND_DIR, "uploads")
+        sync_home_exhibition_to_uploads(upload_root)
+        sync_book_review_to_uploads(upload_root)
+        bg_urls = home_exhibition_upload_urls(upload_root) or [BOOK_INTRO_VIDEO_URL]
         await SiteConfig.get_or_create(
             id=1,
             defaults={
                 "bg_type": "video",
-                "bg_url": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4",
+                "bg_url": bg_urls[0],
+                "bg_videos": bg_urls,
                 "music_enabled": False,
                 "bg_enabled": True,
                 "featured_book_id": book_ids[0],

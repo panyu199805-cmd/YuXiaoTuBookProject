@@ -11,7 +11,12 @@ if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
 fi
 
 bash "$SCRIPT_DIR/01-install-docker.sh"
-bash "$SCRIPT_DIR/02-install-nodejs.sh"
+
+if [[ "${SKIP_NODE_INSTALL:-false}" == "true" ]]; then
+  echo "[install-all] 跳过 Node.js（使用预构建 frontend/dist）"
+else
+  bash "$SCRIPT_DIR/02-install-nodejs.sh"
+fi
 
 if [[ -n "${MYSQL_PASSWORD:-}" ]]; then
   bash "$SCRIPT_DIR/03-install-mysql.sh"

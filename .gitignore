@@ -12,6 +12,8 @@ target/
 .DS_Store
 deploy/.env
 deploy/release-dist.zip
+**/server-deploy.env
 **/deploy/release/*.tar.gz
 **/deploy/release/*.zip
+**/deploy/release/yuxiaotu-intro.mp4
 **/deploy/release/MANIFEST-*.txt

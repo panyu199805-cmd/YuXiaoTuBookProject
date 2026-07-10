@@ -19,11 +19,16 @@ async function load() {
   const res = await request<any>({ url: '/admin/site-config' })
   if (res.code === 200 && res.data) {
     const data = res.data
+    const list = Array.isArray(data.bg_videos)
+      ? data.bg_videos
+      : data.bg_url
+        ? [data.bg_url]
+        : []
     form.value = {
       ...form.value,
       ...data,
-      bg_videos: Array.isArray(data.bg_videos) ? data.bg_videos : data.bg_url ? [data.bg_url] : [],
-      bg_type: 'video',
+      bg_videos: list,
+      bg_type: list.length ? 'video' : 'image',
     }
   }
 }
@@ -33,12 +38,19 @@ async function save() {
     ...form.value,
     bg_type: form.value.bg_videos.length ? 'video' : 'image',
     bg_url: form.value.bg_videos[0] || '',
-    bg_videos: form.value.bg_videos,
+    bg_videos: form.value.bg_videos.length ? form.value.bg_videos : [],
+    bg_enabled: form.value.bg_videos.length > 0,
   }
-  const res = await request({ url: '/admin/site-config', method: 'PUT', data: payload })
+  const res = await request<any>({ url: '/admin/site-config', method: 'PUT', data: payload })
   if (res.code === 200) {
+    if (res.data) {
+      form.value.bg_videos = Array.isArray(res.data.bg_videos) ? res.data.bg_videos : []
+      form.value.bg_url = res.data.bg_url || ''
+      form.value.bg_type = res.data.bg_type || 'image'
+    }
     await siteStore.fetchConfig(true)
-    alert('保存成功')
+    const purged = Number(res.data?.purged_videos?.length || 0)
+    alert(purged > 0 ? `保存成功，已清理 ${purged} 个 homePage 视频文件` : '保存成功')
   } else {
     alert(res.msg || '保存失败')
   }

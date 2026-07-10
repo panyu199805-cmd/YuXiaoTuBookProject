@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional
 
 from app.models import SiteConfig
+from app.services.home_page_video_service import home_page_dir, merge_bg_videos_with_folder
 
 MAX_BG_VIDEOS = 6
 
@@ -26,14 +27,17 @@ def normalize_bg_videos(urls: Optional[List[str]] = None) -> List[str]:
 
 def site_config_to_dict(cfg: SiteConfig) -> Dict[str, Any]:
     raw_videos = getattr(cfg, "bg_videos", None)
-    bg_videos = normalize_bg_videos(raw_videos if isinstance(raw_videos, list) else None)
-    if not bg_videos and cfg.bg_type == "video" and cfg.bg_url:
-        bg_videos = [cfg.bg_url]
+    stored = normalize_bg_videos(raw_videos if isinstance(raw_videos, list) else None)
+    if not stored and cfg.bg_type == "video" and cfg.bg_url:
+        stored = normalize_bg_videos([cfg.bg_url])
+    bg_videos = merge_bg_videos_with_folder(stored, MAX_BG_VIDEOS)
+    bg_url = bg_videos[0] if bg_videos else cfg.bg_url
     return {
         "id": cfg.id,
-        "bg_type": cfg.bg_type,
-        "bg_url": cfg.bg_url,
+        "bg_type": "video" if bg_videos else cfg.bg_type,
+        "bg_url": bg_url,
         "bg_videos": bg_videos,
+        "home_page_storage_dir": home_page_dir(),
         "bg_music": cfg.bg_music,
         "white_noise": cfg.white_noise,
         "music_enabled": cfg.music_enabled,

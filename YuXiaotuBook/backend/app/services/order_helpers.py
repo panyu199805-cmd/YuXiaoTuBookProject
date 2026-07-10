@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from datetime import date, datetime, time
 from typing import Iterable, Optional
 
 from tortoise.expressions import Q
 
 from app.models import Order, OrderItem, User
+from app.utils.timezone import beijing_date_end_to_utc_naive, beijing_date_start_to_utc_naive, to_beijing_str
 
 STATUS_LABELS = {
     "pending_payment": "待支付",
@@ -24,14 +24,6 @@ def summarize_book_names(items: Iterable[OrderItem]) -> str:
     if len(items) == 1:
         return first.book_title if first.quantity <= 1 else f"{first.book_title} × {first.quantity}"
     return f"{first.book_title} 等{len(items)}种"
-
-
-def _parse_date_start(value: str) -> datetime:
-    return datetime.combine(date.fromisoformat(value[:10]), time.min)
-
-
-def _parse_date_end(value: str) -> datetime:
-    return datetime.combine(date.fromisoformat(value[:10]), time.max)
 
 
 async def filter_admin_orders(
@@ -61,14 +53,14 @@ async def filter_admin_orders(
         qs = qs.filter(status=status.strip())
 
     if created_start:
-        qs = qs.filter(created_at__gte=_parse_date_start(created_start))
+        qs = qs.filter(created_at__gte=beijing_date_start_to_utc_naive(created_start))
     if created_end:
-        qs = qs.filter(created_at__lte=_parse_date_end(created_end))
+        qs = qs.filter(created_at__lte=beijing_date_end_to_utc_naive(created_end))
 
     if pay_start:
-        qs = qs.filter(pay_time__gte=_parse_date_start(pay_start))
+        qs = qs.filter(pay_time__gte=beijing_date_start_to_utc_naive(pay_start))
     if pay_end:
-        qs = qs.filter(pay_time__lte=_parse_date_end(pay_end))
+        qs = qs.filter(pay_time__lte=beijing_date_end_to_utc_naive(pay_end))
 
     if book_name and book_name.strip():
         order_ids = await OrderItem.filter(
@@ -112,10 +104,10 @@ async def order_to_dict(
         "receiver_name": order.receiver_name,
         "receiver_phone": order.receiver_phone,
         "receiver_address": order.receiver_address,
-        "pay_time": order.pay_time.isoformat() if order.pay_time else None,
-        "created_at": order.created_at.isoformat() if order.created_at else None,
+        "pay_time": to_beijing_str(order.pay_time),
+        "created_at": to_beijing_str(order.created_at),
         "cancel_reason": order.cancel_reason,
-        "cancelled_at": order.cancelled_at.isoformat() if order.cancelled_at else None,
+        "cancelled_at": to_beijing_str(order.cancelled_at),
         "cancel_by": order.cancel_by,
         "items": [
             {
@@ -132,8 +124,8 @@ async def order_to_dict(
             {
                 "ship_company": order.ship_company,
                 "ship_tracking_no": order.ship_tracking_no,
-                "shipped_at": order.shipped_at.isoformat() if order.shipped_at else None,
-                "completed_at": order.completed_at.isoformat() if order.completed_at else None,
+                "shipped_at": to_beijing_str(order.shipped_at),
+                "completed_at": to_beijing_str(order.completed_at),
             }
         )
     return data

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { protectVideoUrl } from '@/utils/video'
 
 const props = defineProps<{
   src: string
@@ -24,8 +25,14 @@ const muted = ref(false)
 const rateIndex = ref(1)
 const isFullscreen = ref(false)
 const showControls = ref(true)
+const buffering = ref(false)
+const loading = ref(false)
 
 let hideTimer: ReturnType<typeof setTimeout> | null = null
+let timeUpdateRaf = 0
+let visibilityObserver: IntersectionObserver | null = null
+
+const playbackSrc = computed(() => protectVideoUrl(props.src))
 
 const playbackRate = computed(() => PLAYBACK_RATES[rateIndex.value])
 const volumeIcon = computed(() => {
@@ -35,7 +42,7 @@ const volumeIcon = computed(() => {
 })
 
 watch(
-  () => props.src,
+  () => playbackSrc.value,
   () => {
     previewEnded.value = false
     currentTime.value = 0
@@ -64,13 +71,51 @@ onMounted(() => {
     videoRef.value.volume = volume.value
     videoRef.value.playbackRate = playbackRate.value
   }
+  if (playerRef.value) {
+    visibilityObserver = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          ensurePreloading()
+        }
+      },
+      { rootMargin: '160px' },
+    )
+    visibilityObserver.observe(playerRef.value)
+  }
 })
 
 onUnmounted(() => {
   document.removeEventListener('fullscreenchange', syncFullscreen)
+  visibilityObserver?.disconnect()
+  visibilityObserver = null
   if (hideTimer) clearTimeout(hideTimer)
+  if (timeUpdateRaf) cancelAnimationFrame(timeUpdateRaf)
   exitFullscreen()
 })
+
+function ensurePreloading() {
+  const video = videoRef.value
+  if (!video || !playbackSrc.value) return
+  if (video.preload !== 'auto') video.preload = 'auto'
+  if (video.readyState === HTMLMediaElement.HAVE_NOTHING) {
+    video.load()
+  }
+}
+
+function waitUntilCanPlay(video: HTMLVideoElement, timeoutMs = 15000): Promise<void> {
+  if (video.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) {
+    return Promise.resolve()
+  }
+  return new Promise((resolve) => {
+    const timer = window.setTimeout(() => resolve(), timeoutMs)
+    const done = () => {
+      window.clearTimeout(timer)
+      resolve()
+    }
+    video.addEventListener('canplay', done, { once: true })
+    video.addEventListener('error', done, { once: true })
+  })
+}
 
 function syncFullscreen() {
   isFullscreen.value = document.fullscreenElement === playerRef.value
@@ -86,11 +131,23 @@ function revealControls(autoHide = true) {
   }
 }
 
-function togglePlay() {
+async function togglePlay() {
   const video = videoRef.value
   if (!video || previewEnded.value) return
-  if (video.paused) void video.play()
-  else video.pause()
+  if (!video.paused) {
+    video.pause()
+    return
+  }
+  loading.value = true
+  ensurePreloading()
+  await waitUntilCanPlay(video)
+  try {
+    await video.play()
+  } catch {
+    /* ignore autoplay restrictions */
+  } finally {
+    loading.value = false
+  }
 }
 
 function onPlay() {
@@ -114,13 +171,26 @@ function onLoadedMetadata() {
 
 function onTimeUpdate() {
   if (!videoRef.value) return
-  currentTime.value = videoRef.value.currentTime
-  if (!props.maxDuration || previewEnded.value) return
-  if (videoRef.value.currentTime >= props.maxDuration) {
-    videoRef.value.pause()
-    previewEnded.value = true
-    emit('previewEnded')
-  }
+  if (timeUpdateRaf) return
+  timeUpdateRaf = requestAnimationFrame(() => {
+    timeUpdateRaf = 0
+    if (!videoRef.value) return
+    currentTime.value = videoRef.value.currentTime
+    if (!props.maxDuration || previewEnded.value) return
+    if (videoRef.value.currentTime >= props.maxDuration) {
+      videoRef.value.pause()
+      previewEnded.value = true
+      emit('previewEnded')
+    }
+  })
+}
+
+function onWaiting() {
+  buffering.value = true
+}
+
+function onCanPlay() {
+  buffering.value = false
 }
 
 function onSeek(event: Event) {
@@ -179,26 +249,35 @@ function formatTime(seconds: number) {
   >
     <video
       ref="videoRef"
-      :src="src"
+      :src="playbackSrc"
       :poster="poster"
       class="book-video"
       playsinline
       webkit-playsinline
-      preload="metadata"
+      preload="auto"
       disablepictureinpicture
       disableremoteplayback
       controlslist="nodownload noremoteplayback nofullscreen noplaybackrate"
       x-webkit-airplay="deny"
+      referrerpolicy="no-referrer"
       @click="togglePlay"
       @contextmenu.prevent
       @play="onPlay"
       @pause="onPause"
       @loadedmetadata="onLoadedMetadata"
       @timeupdate="onTimeUpdate"
+      @waiting="onWaiting"
+      @canplay="onCanPlay"
     />
 
+    <div class="video-download-shield" aria-hidden="true" @contextmenu.prevent />
+
+    <div v-if="loading || (buffering && playing)" class="book-video-loading" aria-hidden="true">
+      <span class="book-video-loading-dot" />
+    </div>
+
     <button
-      v-if="!playing && !previewEnded"
+      v-if="!playing && !previewEnded && !loading"
       type="button"
       class="book-video-center-play"
       aria-label="播放"
@@ -320,6 +399,33 @@ function formatTime(seconds: number) {
   display: block;
   cursor: pointer;
   background: #000;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+.book-video-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  background: rgba(0, 0, 0, 0.22);
+}
+
+.book-video-loading-dot {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+  animation: book-video-spin 0.75s linear infinite;
+}
+
+@keyframes book-video-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .book-video-player.is-fullscreen .book-video {

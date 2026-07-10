@@ -41,7 +41,7 @@ async function load() {
 }
 
 onMounted(async () => {
-  const cats = await request({ url: '/categories' })
+  const cats = await request<any[]>({ url: '/categories' })
   if (cats.code === 200) categories.value = cats.data || []
   if (route.query.category_id) categoryId.value = Number(route.query.category_id)
   if (route.query.keyword) keyword.value = String(route.query.keyword)

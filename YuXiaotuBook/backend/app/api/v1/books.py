@@ -12,6 +12,7 @@ from app.models import Book, BookVideo, User, UserBookCollect
 from app.schemas.requests import PlayReportRequest
 from app.services.book_service import book_list_item, book_to_dict
 from app.services.member_service import is_vip
+from app.services.video_url_service import to_protected_video_url
 
 router = APIRouter()
 
@@ -95,7 +96,7 @@ async def play_auth(
     vip = await is_vip(user.id) if user else False
     return success(
         {
-            "video_url": video.video_url,
+            "video_url": to_protected_video_url(video.video_url),
             "poster": video.video_cover,
             "duration": video.video_duration,
             "full_access": full_access,

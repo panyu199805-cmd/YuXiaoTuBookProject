@@ -42,9 +42,20 @@ if [[ ! -f "$ENV_FILE" ]]; then
 fi
 
 # shellcheck disable=SC1090
+sed -i 's/\r$//' "$ENV_FILE" 2>/dev/null || true
 set -a
 source "$ENV_FILE"
 set +a
+
+# source 失败时的兜底（URL 含 & 等特殊字符时须加引号）
+if [[ -z "${DATABASE_URL:-}" ]]; then
+  DATABASE_URL="$(grep -E '^DATABASE_URL=' "$ENV_FILE" | head -1 | cut -d= -f2- | sed 's/^"//;s/"$//')"
+  export DATABASE_URL
+fi
+if [[ -z "${JDBC_DATABASE_URL:-}" ]]; then
+  JDBC_DATABASE_URL="$(grep -E '^JDBC_DATABASE_URL=' "$ENV_FILE" | head -1 | cut -d= -f2- | sed 's/^"//;s/"$//')"
+  export JDBC_DATABASE_URL
+fi
 
 if [[ "${MYSQL_PASSWORD:-}" == "your_mysql_password" ]] \
   || [[ "${MYSQL_PASSWORD:-}" == "ChangeMe_Strong_Password_123!" ]] \
@@ -68,32 +79,37 @@ if ! command -v docker >/dev/null 2>&1; then
 fi
 
 if ! docker compose version >/dev/null 2>&1; then
-  log "未找到 docker compose 插件，请安装 docker-compose-plugin"
+  log "未找到 docker compose 插件，请安装 docker-compose-plugin 或 docker-compose-v2"
   exit 1
 fi
 
-if ! command -v npm >/dev/null 2>&1; then
-  log "未安装 Node.js/npm，无法构建前端"
-  exit 1
+FRONTEND_DIST="../frontend/dist"
+if [[ -f "$FRONTEND_DIST/index.html" ]]; then
+  log "使用已打包的前端 dist，跳过 npm 构建"
+else
+  if ! command -v npm >/dev/null 2>&1; then
+    log "未安装 Node.js/npm，且无 frontend/dist，无法部署"
+    exit 1
+  fi
+
+  log "构建前端..."
+  cd ../frontend
+  if [[ -f package-lock.json ]]; then
+    npm ci --registry=https://registry.npmmirror.com
+  else
+    npm install --registry=https://registry.npmmirror.com
+  fi
+  if npm run build 2>/dev/null; then
+    log "前端构建成功"
+  else
+    log "npm run build 失败，改用 npx vite build"
+    npx vite build
+  fi
+  cd "$SCRIPT_DIR"
 fi
 
-log "构建前端..."
-cd ../frontend
-if [[ -f package-lock.json ]]; then
-  npm ci
-else
-  npm install
-fi
-if npm run build 2>/dev/null; then
-  log "前端构建成功"
-else
-  log "npm run build 失败，改用 npx vite build"
-  npx vite build
-fi
-cd "$SCRIPT_DIR"
-
-if [[ ! -d ../frontend/dist ]]; then
-  log "前端构建失败：未生成 frontend/dist"
+if [[ ! -f "$FRONTEND_DIST/index.html" ]]; then
+  log "前端构建失败：未生成 frontend/dist/index.html"
   exit 1
 fi
 

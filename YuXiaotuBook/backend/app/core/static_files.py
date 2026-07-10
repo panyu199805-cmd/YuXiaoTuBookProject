@@ -27,6 +27,9 @@ class CachedStaticFiles(StaticFiles):
             mime = MIME_BY_EXT.get(ext)
             if mime:
                 response.headers["Content-Type"] = mime
+            if ext in (".mp4", ".webm"):
+                response.headers["Content-Disposition"] = "inline"
+                response.headers["Accept-Ranges"] = "bytes"
             if self._should_cache(path):
                 response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
         return response

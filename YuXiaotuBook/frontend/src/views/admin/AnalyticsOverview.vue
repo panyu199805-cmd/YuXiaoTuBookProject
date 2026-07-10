@@ -9,7 +9,9 @@ import {
   User,
 } from '@element-plus/icons-vue'
 import { fetchDashboardOverview, type DashboardOverview } from '@/api/adminStats'
-import { placeholderCover, resolveMediaUrl } from '@/utils/media'
+import { formatBeijingTime } from '@/utils/datetime'
+import { formatBeijingTime } from '@/utils/datetime'
+import { formatBeijingTime } from '@/utils/datetime'
 
 const router = useRouter()
 const loading = ref(true)
@@ -111,15 +113,7 @@ function formatShortDate(iso: string) {
 }
 
 function formatDateTime(iso: string | null) {
-  if (!iso) return '—'
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return iso
-  return date.toLocaleString('zh-CN', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  return formatBeijingTime(iso)
 }
 
 function bookCover(cover: string, id: number) {
