@@ -1,3 +1,6 @@
+/** 构建标识：Console 出现 [YXT-MP] 即表示已加载最新 client */
+export const MP_CLIENT_VERSION = '20260711-17'
+
 export const API_BASE =
   import.meta.env.VITE_API_BASE || 'https://www.yuxiaotubook.com/api/v1'
 

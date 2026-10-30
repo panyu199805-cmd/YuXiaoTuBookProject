@@ -30,6 +30,13 @@ export interface BookDetail extends BookListItem {
   }
 }
 
+export interface PlayAuthVideo {
+  video_url: string
+  poster?: string
+  duration?: number
+  intro?: string
+}
+
 export interface PlayAuth {
   video_url: string
   poster?: string
@@ -37,6 +44,7 @@ export interface PlayAuth {
   full_access: boolean
   max_duration?: number | null
   is_vip?: boolean
+  videos?: PlayAuthVideo[]
 }
 
 export interface BookQuery {

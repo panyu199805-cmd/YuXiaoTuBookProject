@@ -1,3 +1,4 @@
+from app.models.ai_content import AiContentItem, AiContentTask
 from app.models.book import Book, BookVideo
 from app.models.category import Category
 from app.models.collect import UserBookCollect
@@ -22,4 +23,6 @@ __all__ = [
     "UserMember",
     "MemberOrder",
     "UserPreference",
+    "AiContentTask",
+    "AiContentItem",
 ]

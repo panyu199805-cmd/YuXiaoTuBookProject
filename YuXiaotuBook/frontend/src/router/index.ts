@@ -147,13 +147,8 @@ const router = createRouter({
         },
         {
           path: 'content/ai',
-          meta: {
-            title: 'AI 内容生成',
-            parentTitle: '内容管理',
-            group: 'content',
-            placeholderDesc: '对接第三方 AI API，批量生成书籍解说文案、读书笔记与书单文案。',
-          },
-          component: placeholder,
+          meta: { title: 'AI 内容生成', parentTitle: '内容管理', group: 'content' },
+          component: () => import('@/views/admin/AiContent.vue'),
         },
         {
           path: 'content/review',

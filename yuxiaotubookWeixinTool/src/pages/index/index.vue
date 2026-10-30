@@ -4,7 +4,7 @@ import { ref, computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { getFeatured, getHotBooks } from '@/api/home'
 import { getCategories } from '@/api/site'
-import { MEDIA_ORIGIN } from '@/config/env'
+import { API_BASE, MP_CLIENT_VERSION, MEDIA_ORIGIN } from '@/config/env'
 import HeroVideoLayer from '@/components/HeroVideoLayer.vue'
 import BookCard from '@/components/BookCard.vue'
 import EmptyState from '@/components/EmptyState.vue'
@@ -20,6 +20,7 @@ const featured = ref<BookListItem | null>(null)
 const hotBooks = ref<BookListItem[]>([])
 const categories = ref<BookCategory[]>([])
 const loading = ref(false)
+const devApiHint = `${MP_CLIENT_VERSION} ${API_BASE}`
 
 /** 本地 HTTP 媒体无法直接播放视频，需 HTTPS 代理；图片由 SecureImage 处理 */
 const canPlayHeroVideo = computed(
@@ -67,12 +68,17 @@ function goBooks(keyword = '', categoryId?: number) {
 }
 
 function goDetail(id: number) {
+  if (!id || !Number.isFinite(id)) {
+    uni.showToast({ title: '书籍 ID 无效', icon: 'none' })
+    return
+  }
   uni.navigateTo({ url: `/pages/books/detail?id=${id}` })
 }
 </script>
 
 <template>
   <view class="home">
+    <view class="dev-api-hint">{{ devApiHint }}</view>
     <view class="hero" :class="{ 'hero--plain': !canPlayHeroVideo && !bgImage }">
       <HeroVideoLayer v-if="canPlayHeroVideo" :sources="bgVideos" />
       <SecureImage v-else-if="bgImage" class="hero-bg" :src="bgImage" mode="aspectFill" />
@@ -114,12 +120,14 @@ function goDetail(id: number) {
         <text class="section-title">热门书籍</text>
       </view>
       <view v-if="hotBooks.length" class="grid">
-        <BookCard
+        <view
           v-for="b in hotBooks"
           :key="b.id"
-          :book="b"
-          @tap="goDetail"
-        />
+          class="grid-item"
+          @tap="goDetail(b.id)"
+        >
+          <BookCard :book="b" />
+        </view>
       </view>
       <EmptyState v-else-if="!loading" text="暂无热门书籍" />
     </view>
@@ -131,6 +139,15 @@ function goDetail(id: number) {
 
 .home {
   min-height: 100vh;
+}
+
+.dev-api-hint {
+  padding: 8rpx 16rpx;
+  background: #fff3cd;
+  color: #856404;
+  font-size: 20rpx;
+  word-break: break-all;
+  line-height: 1.4;
 }
 
 .hero {

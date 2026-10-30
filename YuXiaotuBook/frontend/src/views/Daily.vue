@@ -124,4 +124,13 @@ onMounted(load)
 }
 .sentence-sm { color: var(--color-text); margin-bottom: 8px; }
 .likes { font-size: 12px; color: var(--color-text-secondary); }
+
+@media (max-width: 767px) {
+  .page { padding: 24px 12px 40px; }
+  .sentence { font-size: 18px; }
+  .book-row { flex-direction: column; align-items: flex-start; }
+  .today-card { padding: 20px 16px; }
+  .timeline-item { flex-direction: column; gap: 8px; }
+  .date { width: auto; }
+}
 </style>

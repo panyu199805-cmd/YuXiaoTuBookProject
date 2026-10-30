@@ -62,21 +62,42 @@ if (Test-Path $envFile) {
   }
 }
 
-$expectedBase = "http://${ip}:8000/api/v1"
-if ($currentBase -ne $expectedBase) {
+$expectedBaseHttp = "http://${ip}:8000/api/v1"
+$expectedBaseHttps = "https://${ip}:8443/api/v1"
+$expectedBaseLocal = "https://127.0.0.1:8443/api/v1"
+
+if ($currentBase -match '127\.0\.0\.1') {
+  Write-Host "[WARN] .env uses 127.0.0.1 — wx.request will fail. Use start-mp-simulator.bat (LAN HTTP)." -ForegroundColor Yellow
+} elseif ($currentBase -match '8443') {
+  Write-Host "[WARN] .env uses HTTPS 8443 — may hit -202 cert error. Simulator: use start-mp-simulator.bat (HTTP)." -ForegroundColor Yellow
+} elseif ($currentBase -ne $expectedBaseHttp -and $currentBase -ne $expectedBaseHttps) {
   Write-Host ""
   Write-Host "[WARN] .env.development API mismatch" -ForegroundColor Yellow
   Write-Host "  current : $currentBase"
-  Write-Host "  expected: $expectedBase"
-  Write-Host "  Update .env.development then rebuild (build-mp-local.bat or dev-mp-weixin.bat)" -ForegroundColor Yellow
+  Write-Host "  expected: $expectedBaseHttps (real device) or $expectedBaseLocal (simulator)"
+  $content = Get-Content $envFile -Raw -Encoding UTF8
+  if ($content -match '8443') {
+    $content = $content -replace 'VITE_API_BASE=.*', "VITE_API_BASE=https://${ip}:8443/api/v1"
+    $content = $content -replace 'VITE_MEDIA_ORIGIN=.*', "VITE_MEDIA_ORIGIN=https://${ip}:8443"
+    $content = $content -replace 'VITE_TRADE_API_BASE=.*', "VITE_TRADE_API_BASE=https://${ip}:8444/api/v1"
+  } else {
+    $content = $content -replace 'VITE_API_BASE=.*', "VITE_API_BASE=$expectedBaseHttp"
+    $content = $content -replace 'VITE_MEDIA_ORIGIN=.*', "VITE_MEDIA_ORIGIN=http://${ip}:8000"
+    $content = $content -replace 'VITE_TRADE_API_BASE=.*', "VITE_TRADE_API_BASE=http://${ip}:8081/api/v1"
+  }
+  Set-Content -Path $envFile -Value $content -Encoding UTF8 -NoNewline
+  Write-Host "[FIX] Updated .env.development to LAN IP $ip" -ForegroundColor Green
+  Write-Host "  Rebuild: build-mp-local.bat" -ForegroundColor Yellow
 } else {
   Write-Host "[OK] .env.development matches LAN IP" -ForegroundColor Green
 }
 
-Write-Host ""
 Write-Host "WeChat DevTools checklist:" -ForegroundColor Cyan
-Write-Host "  [ ] Settings -> Security -> disable domain/TLS check"
-Write-Host "  [ ] Allow WeChat DevTools through Windows Firewall (Private network)"
-Write-Host "  [ ] Import: dist\dev\mp-weixin (watch) OR dist\build\mp-weixin (local build)"
-Write-Host "  [ ] If still timeout: run scripts\dev-https-proxy.ps1 and switch .env to https://${ip}:8443"
+Write-Host "  [ ] Settings -> Proxy -> NO PROXY (fix ERR_TUNNEL_CONNECTION_FAILED)"
+Write-Host "  [ ] Settings -> disable domain check AND TLS check"
+Write-Host "  [ ] Simulator: LAN HTTP http://${ip}:8000 (start-mp-simulator.bat)"
+Write-Host "  [ ] Real device: start-mp-real-device.bat (HTTPS, same Wi-Fi)"
+Write-Host "  [ ] Rebuild: build-mp-local.bat then recompile"
 Write-Host ""
+
+exit 0

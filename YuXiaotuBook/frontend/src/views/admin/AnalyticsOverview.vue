@@ -10,8 +10,7 @@ import {
 } from '@element-plus/icons-vue'
 import { fetchDashboardOverview, type DashboardOverview } from '@/api/adminStats'
 import { formatBeijingTime } from '@/utils/datetime'
-import { formatBeijingTime } from '@/utils/datetime'
-import { formatBeijingTime } from '@/utils/datetime'
+import { placeholderCover, resolveMediaUrl } from '@/utils/media'
 
 const router = useRouter()
 const loading = ref(true)

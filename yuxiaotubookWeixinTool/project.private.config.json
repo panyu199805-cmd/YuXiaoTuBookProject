@@ -1,0 +1,10 @@
+{
+  "description": "本地私有配置，不提交 Git",
+  "projectname": "yuxiaotubook-weixin",
+  "setting": {
+    "urlCheck": false,
+    "ignoreDevUnusedFiles": false,
+    "ignoreUploadUnusedFiles": false
+  },
+  "libVersion": "3.6.5"
+}

@@ -37,8 +37,12 @@ from app.schemas.requests import (
     SiteConfigRequest,
     AdminUserUpdateRequest,
     VideoBindRequest,
+    BookVideosUpdateRequest,
+    AiGenerateRequest,
+    AiItemUpdateRequest,
+    AiItemAcceptRequest,
 )
-from app.services.book_service import book_to_dict
+from app.services.book_service import book_to_dict, video_to_dict
 from app.services.daily_service import daily_to_dict
 from app.services.order_helpers import (
     STATUS_LABELS,
@@ -60,6 +64,19 @@ from app.services.home_page_video_service import (
     save_home_page_video,
     url_to_path,
 )
+from app.services.book_review_video_service import (
+    BOOK_REVIEW_URL_PREFIX,
+    MAX_BOOK_REVIEW_VIDEOS,
+    book_review_dir,
+    delete_book_review_video,
+    is_book_review_video_url,
+    list_book_review_video_urls,
+    normalize_book_review_url,
+    normalize_book_video_url,
+    is_valid_book_video_url,
+    save_book_review_video,
+    url_to_path as book_review_url_to_path,
+)
 from app.services.site_config_helpers import (
     MAX_BG_VIDEOS,
     normalize_bg_videos,
@@ -73,6 +90,15 @@ from app.services.analytics_service import (
     build_system_stats,
 )
 from app.services.user_admin_service import build_user_region_tree, get_admin_user_detail
+from app.services.ai_content_service import (
+    accept_item,
+    ai_runtime_config,
+    create_and_run_task,
+    discard_item,
+    get_task_detail,
+    list_tasks,
+    update_item_text,
+)
 
 upload_router = APIRouter(tags=["Admin-上传"])
 books_router = APIRouter(tags=["Admin-书籍"])
@@ -84,6 +110,7 @@ daily_router = APIRouter(tags=["Admin-每日读书"])
 member_router = APIRouter(tags=["Admin-会员"])
 users_router = APIRouter(tags=["Admin-用户"])
 stats_router = APIRouter(tags=["Admin-数据统计"])
+ai_router = APIRouter(tags=["Admin-AI内容"])
 
 router = APIRouter()
 
@@ -152,6 +179,45 @@ async def delete_home_page_video_file(
     return success(None, "已删除")
 
 
+@upload_router.post("/book-review-videos/upload", summary="上传图书解读视频到 bookReview 目录")
+async def upload_book_review_video(
+    file: UploadFile = File(...),
+    user: User = Depends(get_admin_user),
+):
+    ext = os.path.splitext(file.filename or "")[1].lower()
+    if ext not in VIDEO_EXTS:
+        return fail("解读视频仅支持 mp4/webm", 400)
+    content = await file.read()
+    if len(content) > MAX_HOME_PAGE_VIDEO_SIZE:
+        return fail("视频不能超过100MB", 400)
+    url = save_book_review_video(file.filename or "video.mp4", content)
+    return success({"url": url, "media_type": "video"})
+
+
+@upload_router.delete("/book-review-videos", summary="删除 bookReview 目录中的解读视频")
+async def delete_book_review_video_file(
+    url: str,
+    user: User = Depends(get_admin_user),
+):
+    if not is_book_review_video_url(url):
+        return fail(f"仅允许删除 {BOOK_REVIEW_URL_PREFIX}/ 下的视频", 400)
+    if not book_review_url_to_path(url):
+        return fail("无效的视频路径", 400)
+    if not delete_book_review_video(url):
+        return fail("视频不存在或已删除", 404)
+    return success(None, "已删除")
+
+
+@upload_router.get("/book-review-videos", summary="列出 bookReview 目录中的解读视频")
+async def list_book_review_videos(user: User = Depends(get_admin_user)):
+    return success(
+        {
+            "storage_dir": book_review_dir(),
+            "urls": list_book_review_video_urls(),
+        }
+    )
+
+
 @upload_router.get("/home-page-videos", summary="列出 homePage 目录中的背景视频")
 async def list_home_page_videos(user: User = Depends(get_admin_user)):
     return success(
@@ -203,33 +269,110 @@ async def admin_delete_book(book_id: int, user: User = Depends(get_admin_user)):
 
 @videos_router.get("/videos", summary="视频列表")
 async def admin_list_videos(user: User = Depends(get_admin_user)):
-    videos = await BookVideo.all().order_by("-id")
-    return success(
-        [
+    videos = await BookVideo.all().order_by("book_id", "sort_order", "id")
+    book_titles = {
+        b.id: b.title
+        for b in await Book.filter(id__in=[v.book_id for v in videos] or [-1])
+    }
+    grouped: dict[int, dict] = {}
+    for v in videos:
+        item = video_to_dict(v)
+        item["book_title"] = book_titles.get(v.book_id, "")
+        bucket = grouped.setdefault(
+            v.book_id,
             {
-                "id": v.id,
                 "book_id": v.book_id,
-                "video_cover": v.video_cover,
-                "video_url": v.video_url,
-                "video_duration": v.video_duration,
-                "video_intro": v.video_intro,
-                "status": v.status,
-                "play_count": v.play_count,
+                "book_title": item["book_title"],
+                "videos": [],
+                "play_count": 0,
+                "status": 1,
+            },
+        )
+        bucket["videos"].append(item)
+        bucket["play_count"] += v.play_count or 0
+        if v.status != 1:
+            bucket["status"] = 0
+    rows = []
+    for bucket in grouped.values():
+        first_url = bucket["videos"][0]["video_url"] if bucket["videos"] else ""
+        rows.append(
+            {
+                **bucket,
+                "video_count": len(bucket["videos"]),
+                "video_url": first_url,
             }
-            for v in videos
-        ]
-    )
+        )
+    rows.sort(key=lambda row: row["book_id"], reverse=True)
+    return success(rows)
 
 
-@videos_router.post("/videos", summary="绑定/更新视频")
+@videos_router.get("/videos/by-book/{book_id}", summary="按书籍获取解读视频列表")
+async def admin_list_videos_by_book(book_id: int, user: User = Depends(get_admin_user)):
+    book = await Book.get_or_none(id=book_id)
+    if not book:
+        return fail("书籍不存在", 404)
+    videos = await BookVideo.filter(book_id=book_id).order_by("sort_order", "id")
+    return success([video_to_dict(v) for v in videos])
+
+
+@videos_router.put("/videos/by-book/{book_id}", summary="批量保存某书籍的解读视频")
+async def admin_update_videos_by_book(
+    book_id: int,
+    body: BookVideosUpdateRequest,
+    user: User = Depends(get_admin_user),
+):
+    book = await Book.get_or_none(id=book_id)
+    if not book:
+        return fail("书籍不存在", 404)
+    if len(body.videos) > MAX_BOOK_REVIEW_VIDEOS:
+        return fail(f"每本书最多绑定 {MAX_BOOK_REVIEW_VIDEOS} 个解读视频", 400)
+
+    existing = await BookVideo.filter(book_id=book_id).order_by("sort_order", "id")
+    preserved_explain = next((v.explain_content for v in existing if v.explain_content), None)
+    await BookVideo.filter(book_id=book_id).delete()
+
+    default_cover = book.cover or ""
+    created_ids: List[int] = []
+    for index, item in enumerate(body.videos):
+        url = normalize_book_video_url(item.video_url.strip())
+        if not is_valid_book_video_url(url):
+            return fail(f"无效解读视频地址：{item.video_url}", 400)
+        video = await BookVideo.create(
+            book_id=book_id,
+            sort_order=index,
+            video_cover=item.video_cover or default_cover,
+            video_url=url,
+            video_duration=item.video_duration,
+            video_intro=item.video_intro,
+            explain_content=preserved_explain if index == 0 else None,
+            status=item.status,
+        )
+        created_ids.append(video.id)
+
+    return success({"book_id": book_id, "video_ids": created_ids, "count": len(created_ids)})
+
+
+@videos_router.post("/videos", summary="绑定/更新单条视频（兼容旧接口）")
 async def admin_bind_video(body: VideoBindRequest, user: User = Depends(get_admin_user)):
-    existing = await BookVideo.get_or_none(book_id=body.book_id)
+    book = await Book.get_or_none(id=body.book_id)
+    if not book:
+        return fail("书籍不存在", 404)
+    url = normalize_book_video_url(body.video_url.strip())
+    if not is_valid_book_video_url(url):
+        return fail(f"无效解读视频地址：{body.video_url}", 400)
+    payload = body.model_dump()
+    payload["video_url"] = url
+    existing = await BookVideo.filter(book_id=body.book_id, video_url=url).first()
     if existing:
-        for k, v in body.model_dump().items():
+        for k, v in payload.items():
             setattr(existing, k, v)
         await existing.save()
         return success({"id": existing.id})
-    video = await BookVideo.create(**body.model_dump())
+    count = await BookVideo.filter(book_id=body.book_id).count()
+    if count >= MAX_BOOK_REVIEW_VIDEOS:
+        return fail(f"每本书最多绑定 {MAX_BOOK_REVIEW_VIDEOS} 个解读视频", 400)
+    payload["sort_order"] = count
+    video = await BookVideo.create(**payload)
     return success({"id": video.id})
 
 
@@ -586,6 +729,86 @@ async def admin_stats_system(user: User = Depends(get_admin_user)):
     return success(await build_system_stats())
 
 
+@ai_router.get("/ai/config", summary="AI 内容生成配置状态")
+async def admin_ai_config(user: User = Depends(get_admin_user)):
+    return success(ai_runtime_config())
+
+
+@ai_router.post("/ai/generate", summary="创建并执行 AI 内容生成任务")
+async def admin_ai_generate(body: AiGenerateRequest, user: User = Depends(get_admin_user)):
+    try:
+        data = await create_and_run_task(
+            operator_id=user.id,
+            book_ids=body.book_ids,
+            content_types=body.content_types,
+            tone=body.tone,
+            length=body.length,
+            extra_prompt=body.extra_prompt,
+            write_mode=body.write_mode,
+        )
+    except ValueError as e:
+        return fail(str(e), 400)
+    except Exception as e:  # noqa: BLE001
+        return fail(f"生成失败: {e}", 500)
+    return success(data, "生成完成")
+
+
+@ai_router.get("/ai/tasks", summary="AI 生成任务列表")
+async def admin_ai_tasks(limit: int = 20, user: User = Depends(get_admin_user)):
+    return success(await list_tasks(limit=limit))
+
+
+@ai_router.get("/ai/tasks/{task_id}", summary="AI 生成任务详情")
+async def admin_ai_task_detail(task_id: int, user: User = Depends(get_admin_user)):
+    try:
+        data = await get_task_detail(task_id)
+    except ValueError as e:
+        return fail(str(e), 404)
+    return success(data)
+
+
+@ai_router.put("/ai/items/{item_id}", summary="编辑 AI 生成文案")
+async def admin_ai_item_update(
+    item_id: int, body: AiItemUpdateRequest, user: User = Depends(get_admin_user)
+):
+    try:
+        data = await update_item_text(item_id, body.text)
+    except ValueError as e:
+        return fail(str(e), 400)
+    return success(data, "已保存")
+
+
+@ai_router.post("/ai/items/{item_id}/accept", summary="采纳 AI 文案并写入业务表")
+async def admin_ai_item_accept(
+    item_id: int, body: AiItemAcceptRequest, user: User = Depends(get_admin_user)
+):
+    publish_date = None
+    if body.publish_date:
+        try:
+            publish_date = date.fromisoformat(body.publish_date)
+        except ValueError:
+            return fail("publish_date 格式应为 YYYY-MM-DD", 400)
+    try:
+        data = await accept_item(
+            item_id,
+            write_mode=body.write_mode,
+            publish_date=publish_date,
+            text=body.text,
+        )
+    except ValueError as e:
+        return fail(str(e), 400)
+    return success(data, "已采纳入库")
+
+
+@ai_router.post("/ai/items/{item_id}/discard", summary="丢弃 AI 生成文案")
+async def admin_ai_item_discard(item_id: int, user: User = Depends(get_admin_user)):
+    try:
+        data = await discard_item(item_id)
+    except ValueError as e:
+        return fail(str(e), 400)
+    return success(data, "已丢弃")
+
+
 router.include_router(upload_router)
 router.include_router(books_router)
 router.include_router(videos_router)
@@ -596,3 +819,4 @@ router.include_router(daily_router)
 router.include_router(member_router)
 router.include_router(users_router)
 router.include_router(stats_router)
+router.include_router(ai_router)

@@ -19,7 +19,7 @@ export function getBook(id: number) {
 }
 
 export function getPlayAuth(id: number) {
-  return fetchData(get<PlayAuth>(`/books/${id}/play-auth`))
+  return fetchData(get<PlayAuth>(`/books/${id}/play-auth`, { auth: true, redirectOn401: false }))
 }
 
 export function getSimilar(id: number) {

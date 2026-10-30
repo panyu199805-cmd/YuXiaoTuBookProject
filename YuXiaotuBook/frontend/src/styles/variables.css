@@ -9,4 +9,6 @@
   --shadow-card: 0 2px 12px rgba(0, 0, 0, 0.06);
   --radius-card: 8px;
   --max-width: 1200px;
+  --bp-tablet: 1023px;
+  --bp-mobile: 767px;
 }

@@ -107,4 +107,15 @@ onMounted(load)
 .price { font-size: 24px; color: var(--color-primary); margin: 12px 0; font-weight: 600; }
 ul { margin: 16px 0 20px; padding-left: 20px; color: var(--color-text-secondary); }
 li { margin-bottom: 6px; }
+
+@media (max-width: 1023px) {
+  .grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 767px) {
+  .page { padding: 24px 12px 40px; }
+  .grid { grid-template-columns: 1fr; }
+  .pkg-card { padding: 20px 16px; }
+  .price { font-size: 20px; }
+}
 </style>

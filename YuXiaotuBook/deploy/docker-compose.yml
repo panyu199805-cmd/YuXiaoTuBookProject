@@ -1,4 +1,4 @@
-name: YuXiaotuBookCustomer
+name: yuxiaotubookcustomer
 
 services:
   mysql:
@@ -8,7 +8,8 @@ services:
       MYSQL_ROOT_PASSWORD: "123456"
       MYSQL_DATABASE: yuxiaotu_book
     ports:
-      - "3306:3306"
+      # 本机 3306/3307 常被其他项目占用，宿主机改映射 3308；容器内仍是 3306
+      - "3308:3306"
     volumes:
       - mysql_data:/var/lib/mysql
     restart: unless-stopped
@@ -41,6 +42,11 @@ services:
       GUEST_VIDEO_PREVIEW_SECONDS: ${GUEST_VIDEO_PREVIEW_SECONDS:-180}
       DEBUG: ${DEBUG:-true}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5188,http://127.0.0.1:5188}
+      AI_API_KEY: ${AI_API_KEY:-}
+      AI_BASE_URL: ${AI_BASE_URL:-https://api.deepseek.com/v1}
+      AI_MODEL: ${AI_MODEL:-deepseek-chat}
+      AI_TIMEOUT_SECONDS: ${AI_TIMEOUT_SECONDS:-60}
+      AI_MOCK_ENABLED: ${AI_MOCK_ENABLED:-true}
     volumes:
       - ../backend/static:/app/static:ro
       - ../backend/uploads:/app/uploads
@@ -52,14 +58,21 @@ services:
       - ../backend/app/api/v1/books.py:/app/app/api/v1/books.py:ro
       - ../backend/app/models/site.py:/app/app/models/site.py:ro
       - ../backend/app/models/order.py:/app/app/models/order.py:ro
+      - ../backend/app/models/ai_content.py:/app/app/models/ai_content.py:ro
+      - ../backend/app/models/__init__.py:/app/app/models/__init__.py:ro
       - ../backend/app/core/config.py:/app/app/core/config.py:ro
       - ../backend/app/core/static_files.py:/app/app/core/static_files.py:ro
       - ../backend/app/schemas/requests.py:/app/app/schemas/requests.py:ro
       - ../backend/app/services/site_config_helpers.py:/app/app/services/site_config_helpers.py:ro
       - ../backend/app/services/analytics_service.py:/app/app/services/analytics_service.py:ro
+      - ../backend/app/services/ai_content_service.py:/app/app/services/ai_content_service.py:ro
       - ../backend/app/services/home_page_video_service.py:/app/app/services/home_page_video_service.py:ro
       - ../backend/app/services/video_url_service.py:/app/app/services/video_url_service.py:ro
+      - ../backend/app/services/book_review_video_service.py:/app/app/services/book_review_video_service.py:ro
       - ../backend/app/services/book_service.py:/app/app/services/book_service.py:ro
+      - ../backend/app/models/book.py:/app/app/models/book.py:ro
+      - ../backend/app/db/database.py:/app/app/db/database.py:ro
+      - ../backend/app/db/schema_patches.py:/app/app/db/schema_patches.py:ro
       - ../backend/app/services/order_helpers.py:/app/app/services/order_helpers.py:ro
       - ../backend/app/utils:/app/app/utils:ro
       - ../backend/app/services/order_service.py:/app/app/services/order_service.py:ro

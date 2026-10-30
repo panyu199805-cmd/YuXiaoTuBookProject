@@ -1,4 +1,4 @@
-# Build Ubuntu 24.04 deployment tarball
+﻿# Build Ubuntu 24.04 deployment tarball
 # Usage: cd YuXiaotuBook\deploy ; .\pack-release.ps1
 
 param(

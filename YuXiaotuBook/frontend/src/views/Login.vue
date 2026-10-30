@@ -62,4 +62,8 @@ async function submit() {
   border-radius: 6px;
 }
 .error { color: #c00; font-size: 14px; }
+
+@media (max-width: 767px) {
+  .auth-box { width: 100%; padding: 24px; }
+}
 </style>

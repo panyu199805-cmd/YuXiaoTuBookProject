@@ -13,16 +13,26 @@ const error = ref('')
 
 async function submit() {
   error.value = ''
-  if (!form.value.username || !form.value.password) {
+  const username = form.value.username.trim()
+  const password = form.value.password
+  if (!username || !password) {
     error.value = '请填写用户名和密码'
+    return
+  }
+  if (username.length < 4 || username.length > 20) {
+    error.value = '用户名需 4-20 位'
+    return
+  }
+  if (password.length < 8) {
+    error.value = '密码至少 8 位'
     return
   }
   loading.value = true
   try {
     await userStore.register({
-      username: form.value.username,
-      password: form.value.password,
-      nickname: form.value.nickname || form.value.username,
+      username,
+      password,
+      nickname: form.value.nickname.trim() || username,
     })
     uni.showToast({ title: '注册成功', icon: 'success' })
     setTimeout(() => uni.switchTab({ url: '/pages/index/index' }), 500)

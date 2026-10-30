@@ -10,7 +10,7 @@ from app.core.deps import get_current_user_optional
 from app.core.response import fail, success
 from app.models import Book, BookVideo, User, UserBookCollect
 from app.schemas.requests import PlayReportRequest
-from app.services.book_service import book_list_item, book_to_dict
+from app.services.book_service import book_list_item, book_to_dict, list_active_book_videos
 from app.services.member_service import is_vip
 from app.services.video_url_service import to_protected_video_url
 
@@ -84,8 +84,8 @@ async def play_auth(
     book = await Book.get_or_none(id=book_id, status="published")
     if not book:
         return fail("书籍不存在", 404)
-    video = await BookVideo.get_or_none(book_id=book_id, status=1)
-    if not video:
+    videos = await list_active_book_videos(book_id)
+    if not videos:
         return fail("暂无解读视频", 404)
 
     full_access = user is not None
@@ -94,11 +94,22 @@ async def play_auth(
         max_duration = settings.GUEST_VIDEO_PREVIEW_SECONDS
 
     vip = await is_vip(user.id) if user else False
+    playlist = [
+        {
+            "video_url": to_protected_video_url(item.video_url),
+            "poster": item.video_cover,
+            "duration": item.video_duration,
+            "intro": item.video_intro,
+        }
+        for item in videos
+    ]
+    first = playlist[0]
     return success(
         {
-            "video_url": to_protected_video_url(video.video_url),
-            "poster": video.video_cover,
-            "duration": video.video_duration,
+            "video_url": first["video_url"],
+            "poster": first["poster"],
+            "duration": first["duration"],
+            "videos": playlist,
             "full_access": full_access,
             "max_duration": max_duration,
             "is_vip": vip,
@@ -113,7 +124,7 @@ async def play_report(book_id: int, body: PlayReportRequest):
     key = (book_id,)
     if key in _play_reported:
         return success(None)
-    video = await BookVideo.get_or_none(book_id=book_id, status=1)
+    video = await BookVideo.filter(book_id=book_id, status=1).order_by("sort_order", "id").first()
     if video:
         video.play_count += 1
         await video.save()

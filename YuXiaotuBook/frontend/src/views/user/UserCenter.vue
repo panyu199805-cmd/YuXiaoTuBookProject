@@ -226,4 +226,15 @@ onMounted(load)
 .amount { font-weight: 600; margin-top: 6px; }
 .logistics, .addr { font-size: 13px; color: var(--color-text-secondary); margin-top: 6px; }
 .empty { text-align: center; color: var(--color-text-secondary); padding: 24px 0; }
+
+@media (max-width: 767px) {
+  .page { padding: 24px 12px 40px; }
+  .card { padding: 16px; }
+  .overview .profile { flex-direction: column; align-items: flex-start; }
+  .ship-head { flex-direction: column; gap: 4px; }
+  .tabs { gap: 4px; }
+  .tabs button { font-size: 12px; padding: 4px 10px; }
+  .quick-links { gap: 8px; }
+  .quick-links a { font-size: 12px; padding: 4px 10px; }
+}
 </style>

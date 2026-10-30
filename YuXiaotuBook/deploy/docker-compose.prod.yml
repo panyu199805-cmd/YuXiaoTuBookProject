@@ -22,6 +22,11 @@ services:
       DEBUG: ${DEBUG:-false}
       CORS_ORIGINS: ${CORS_ORIGINS:?请在 .env 中设置 CORS_ORIGINS}
       UPLOAD_DIR: /app/uploads
+      AI_API_KEY: ${AI_API_KEY:-}
+      AI_BASE_URL: ${AI_BASE_URL:-https://api.deepseek.com/v1}
+      AI_MODEL: ${AI_MODEL:-deepseek-chat}
+      AI_TIMEOUT_SECONDS: ${AI_TIMEOUT_SECONDS:-60}
+      AI_MOCK_ENABLED: ${AI_MOCK_ENABLED:-true}
     volumes:
       - ${UPLOAD_DATA_DIR:-/usr/local/projects/yuxiaotu/data/uploads}:/app/uploads
     expose:

@@ -1,4 +1,4 @@
-# YuXiaoTu Book - pack, upload, deploy to Tencent Cloud
+﻿# YuXiaoTu Book - pack, upload, deploy to Tencent Cloud
 # Usage:
 #   cd deploy docs folder
 #   .\upload-and-deploy.ps1 -RebuildFrontend

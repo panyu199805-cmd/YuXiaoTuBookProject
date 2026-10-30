@@ -30,6 +30,7 @@ function goLogin() {
 }
 
 function goDetail(id: number) {
+  if (!id || !Number.isFinite(id)) return
   uni.navigateTo({ url: `/pages/books/detail?id=${id}` })
 }
 </script>
@@ -37,7 +38,9 @@ function goDetail(id: number) {
 <template>
   <view class="page container">
     <view v-if="books.length" class="grid">
-      <BookCard v-for="b in books" :key="b.id" :book="b" @tap="goDetail" />
+      <view v-for="b in books" :key="b.id" class="grid-item" @tap="goDetail(b.id)">
+        <BookCard :book="b" />
+      </view>
     </view>
     <EmptyState
       v-else-if="needLogin"

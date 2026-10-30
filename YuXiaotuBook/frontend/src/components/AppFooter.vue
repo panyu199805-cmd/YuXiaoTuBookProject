@@ -14,4 +14,7 @@
   font-size: 14px;
   border-top: 1px solid var(--color-border);
 }
+@media (max-width: 767px) {
+  .footer { font-size: 13px; padding: 16px 12px; }
+}
 </style>

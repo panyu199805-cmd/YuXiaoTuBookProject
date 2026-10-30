@@ -25,6 +25,7 @@ from app.models import (
 )
 from app.services.order_helpers import STATUS_LABELS
 from app.services.user_admin_service import UNKNOWN_CITY, UNKNOWN_PROVINCE, _region
+from app.utils.timezone import to_beijing_str
 
 REVENUE_STATUSES = ("paid", "shipped", "completed")
 _PROCESS_START = time.time()

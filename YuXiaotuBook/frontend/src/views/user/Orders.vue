@@ -38,4 +38,10 @@ onMounted(async () => {
 .status { color: var(--color-primary); }
 .amount { margin-top: 8px; font-weight: 600; }
 .empty { text-align: center; color: var(--color-text-secondary); }
+
+@media (max-width: 767px) {
+  .page { padding: 24px 12px 40px; }
+  .order-card { padding: 14px 16px; }
+  .head { flex-direction: column; gap: 4px; }
+}
 </style>

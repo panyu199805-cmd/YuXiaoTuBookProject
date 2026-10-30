@@ -29,4 +29,7 @@ onMounted(async () => {
   gap: 20px;
 }
 .empty { text-align: center; color: var(--color-text-secondary); }
+
+@media (max-width: 1023px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 767px) { .grid { grid-template-columns: 1fr; } }
 </style>

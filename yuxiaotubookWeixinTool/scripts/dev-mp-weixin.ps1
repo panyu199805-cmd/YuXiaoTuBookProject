@@ -2,6 +2,9 @@
 $ErrorActionPreference = "Stop"
 Set-Location (Join-Path $PSScriptRoot "..")
 
+& (Join-Path $PSScriptRoot "check-mp-api.ps1")
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
 Write-Host "=== YuXiaoTu WeChat Mini Program Dev Build ===" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "Close WeChat DevTools for this project, then press Enter..." -ForegroundColor Yellow

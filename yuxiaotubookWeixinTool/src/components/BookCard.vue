@@ -8,8 +8,6 @@ const props = defineProps<{
   book: BookListItem
 }>()
 
-const emit = defineEmits<{ tap: [id: number] }>()
-
 const displayCover = ref(resolveMediaUrl(props.book.cover, props.book.id))
 
 watch(
@@ -22,14 +20,10 @@ watch(
 function onCoverError() {
   displayCover.value = placeholderCover(props.book.id)
 }
-
-function onTap() {
-  emit('tap', props.book.id)
-}
 </script>
 
 <template>
-  <view class="book-card" @tap="onTap">
+  <view class="book-card">
     <view class="cover-wrap">
       <SecureImage
         class="cover"

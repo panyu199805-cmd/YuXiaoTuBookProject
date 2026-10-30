@@ -24,7 +24,8 @@ class Book(Model):
 
 class BookVideo(Model):
     id = fields.IntField(pk=True)
-    book_id = fields.IntField(unique=True)
+    book_id = fields.IntField()
+    sort_order = fields.IntField(default=0)
     video_cover = fields.CharField(max_length=500)
     video_url = fields.CharField(max_length=500)
     video_duration = fields.FloatField(default=0)

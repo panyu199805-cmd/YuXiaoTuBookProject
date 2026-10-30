@@ -62,6 +62,18 @@ class VideoBindRequest(BaseModel):
     status: int = 1
 
 
+class BookVideoItemRequest(BaseModel):
+    video_cover: str = ""
+    video_url: str
+    video_duration: float = 0
+    video_intro: Optional[str] = None
+    status: int = 1
+
+
+class BookVideosUpdateRequest(BaseModel):
+    videos: List[BookVideoItemRequest] = Field(default_factory=list)
+
+
 class CategoryRequest(BaseModel):
     name: str
     slug: str
@@ -131,6 +143,25 @@ class AdminUserUpdateRequest(BaseModel):
     province: Optional[str] = Field(None, max_length=50)
     city: Optional[str] = Field(None, max_length=50)
     status: Optional[int] = None
+
+
+class AiGenerateRequest(BaseModel):
+    book_ids: List[int] = Field(..., min_length=1)
+    content_types: List[str] = Field(..., min_length=1)
+    tone: str = "healing"
+    length: str = "medium"
+    extra_prompt: Optional[str] = Field(None, max_length=500)
+    write_mode: str = "empty_only"
+
+
+class AiItemUpdateRequest(BaseModel):
+    text: str = Field(..., min_length=1)
+
+
+class AiItemAcceptRequest(BaseModel):
+    text: Optional[str] = None
+    write_mode: Optional[str] = None
+    publish_date: Optional[str] = None
 
 
 def validate_username(username: str) -> bool:

@@ -41,7 +41,10 @@ http.interceptors.response.use(
 )
 
 export async function request<T>(config: AxiosRequestConfig): Promise<ApiResponse<T>> {
-  const res = await http.request<ApiResponse<T>>(config)
+  const res = await http.request<ApiResponse<T>>({
+    timeout: 30000,
+    ...config,
+  })
   return res.data
 }
 

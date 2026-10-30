@@ -85,3 +85,18 @@ video::-internal-media-controls-download-button {
   pointer-events: auto;
   background: transparent;
 }
+
+/* ===== 移动端全局适配 ===== */
+@media (max-width: 767px) {
+  .container {
+    padding: 0 12px;
+  }
+
+  .page-title {
+    font-size: 20px;
+  }
+
+  .btn {
+    min-height: 44px;
+    padding: 8px 16px;
+  }

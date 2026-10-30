@@ -12,6 +12,7 @@ node_modules
 dist
 *.local
 .env.development.local
+.local-certs/
 
 # Editor directories and files
 .idea

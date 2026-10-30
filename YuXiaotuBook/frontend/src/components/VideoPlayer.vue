@@ -6,10 +6,12 @@ const props = defineProps<{
   src: string
   poster?: string
   maxDuration?: number | null
+  autoplay?: boolean
 }>()
 
 const emit = defineEmits<{
   previewEnded: []
+  ended: []
 }>()
 
 const PLAYBACK_RATES = [0.75, 1, 1.25, 1.5, 2] as const
@@ -48,6 +50,7 @@ watch(
     currentTime.value = 0
     duration.value = 0
     if (videoRef.value) videoRef.value.load()
+    if (props.autoplay) void tryAutoplay()
   },
 )
 
@@ -131,6 +134,21 @@ function revealControls(autoHide = true) {
   }
 }
 
+async function tryAutoplay() {
+  const video = videoRef.value
+  if (!video || previewEnded.value) return
+  loading.value = true
+  ensurePreloading()
+  await waitUntilCanPlay(video)
+  try {
+    await video.play()
+  } catch {
+    /* ignore autoplay restrictions */
+  } finally {
+    loading.value = false
+  }
+}
+
 async function togglePlay() {
   const video = videoRef.value
   if (!video || previewEnded.value) return
@@ -191,6 +209,15 @@ function onWaiting() {
 
 function onCanPlay() {
   buffering.value = false
+  if (props.autoplay && videoRef.value?.paused) {
+    void tryAutoplay()
+  }
+}
+
+function onEnded() {
+  playing.value = false
+  showControls.value = true
+  emit('ended')
 }
 
 function onSeek(event: Event) {
@@ -268,6 +295,7 @@ function formatTime(seconds: number) {
       @timeupdate="onTimeUpdate"
       @waiting="onWaiting"
       @canplay="onCanPlay"
+      @ended="onEnded"
     />
 
     <div class="video-download-shield" aria-hidden="true" @contextmenu.prevent />

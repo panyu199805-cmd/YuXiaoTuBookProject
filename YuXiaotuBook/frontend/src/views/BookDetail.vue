@@ -13,6 +13,9 @@ const route = useRoute()
 const router = useRouter()
 const store = useUserStore()
 const book = ref<any>(null)
+const videoPlaylist = ref<Array<{ video_url: string; poster?: string; duration?: number }>>([])
+const currentVideoIndex = ref(0)
+const autoPlayNext = ref(false)
 const videoUrl = ref('')
 const videoPoster = ref('')
 const maxDuration = ref<number | null>(null)
@@ -39,6 +42,9 @@ async function load() {
   const id = route.params.id
   book.value = null
   similar.value = []
+  videoPlaylist.value = []
+  currentVideoIndex.value = 0
+  autoPlayNext.value = false
   videoUrl.value = ''
   videoPoster.value = ''
   bookCover.value = ''
@@ -52,8 +58,17 @@ async function load() {
     if (res.data.has_video) {
       const play = await request<any>({ url: `/books/${id}/play-auth` })
       if (play.code === 200) {
-        videoUrl.value = play.data.video_url
-        videoPoster.value = play.data.poster
+        const playlist = play.data.videos?.length
+          ? play.data.videos
+          : [
+              {
+                video_url: play.data.video_url,
+                poster: play.data.poster,
+                duration: play.data.duration,
+              },
+            ]
+        videoPlaylist.value = playlist
+        applyCurrentVideo()
         fullAccess.value = play.data.full_access
         maxDuration.value = play.data.max_duration ?? null
       }
@@ -146,6 +161,25 @@ async function submitOrder() {
   }
 }
 
+function applyCurrentVideo() {
+  const current = videoPlaylist.value[currentVideoIndex.value]
+  if (!current) {
+    videoUrl.value = ''
+    videoPoster.value = ''
+    return
+  }
+  videoUrl.value = current.video_url
+  videoPoster.value = current.poster || ''
+}
+
+function onVideoEnded() {
+  if (currentVideoIndex.value < videoPlaylist.value.length - 1) {
+    autoPlayNext.value = true
+    currentVideoIndex.value += 1
+    applyCurrentVideo()
+  }
+}
+
 function onPreviewEnded() {
   if (!store.isLoggedIn) {
     router.push({ name: 'Login', query: { redirect: route.fullPath } })
@@ -166,11 +200,17 @@ watch(
   <div class="container page" v-if="book" :key="String(route.params.id)">
     <div v-if="videoUrl" class="video-section">
       <VideoPlayer
+        :key="`${book.id}-${currentVideoIndex}`"
         :src="videoUrl"
         :poster="videoPoster"
         :max-duration="fullAccess ? null : maxDuration"
+        :autoplay="autoPlayNext"
         @preview-ended="onPreviewEnded"
+        @ended="onVideoEnded"
       />
+      <p v-if="videoPlaylist.length > 1" class="playlist-hint">
+        正在播放第 {{ currentVideoIndex + 1 }} / {{ videoPlaylist.length }} 条解读视频
+      </p>
       <p v-if="!fullAccess && maxDuration" class="preview-hint">
         游客试看 {{ Math.floor((maxDuration || 0) / 60) }} 分钟，登录看全片
       </p>
@@ -237,7 +277,8 @@ watch(
 .video-section { margin-bottom: 32px; }
 .no-video { text-align: center; padding: 40px; }
 .no-video img { max-width: 200px; border-radius: 8px; }
-.preview-hint {
+.preview-hint,
+.playlist-hint {
   margin-top: 8px;
   font-size: 13px;
   color: var(--color-text-secondary);
@@ -265,4 +306,12 @@ watch(
 }
 .order-actions { display: flex; gap: 12px; justify-content: flex-end; }
 @media (max-width: 1023px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 767px) {
+  .grid { grid-template-columns: 1fr; }
+  .detail h1 { font-size: 22px; }
+  .order-box { width: 100%; max-width: 100%; border-radius: 0; }
+  .actions { flex-direction: column; align-items: stretch; }
+  .actions .btn { width: 100%; }
+  .no-video img { max-width: 140px; }
+}
 </style>

@@ -1,10 +1,9 @@
-# 本地 HTTPS 代理：解决小程序基础库 3.15+ 禁止 HTTP 图片/视频
-# 用法：先启动 本地运行.ps1，再运行本脚本，然后 .env 使用 8443 端口
-#
-# 前置：Python :8000、Java :8081 已启动
-# 微信开发者工具：勾选「不校验合法域名」+「不校验 TLS 证书」
+# Local HTTPS proxy for WeChat mini program (8443->8000, 8444->8081)
+# Requires: Python API :8000, Java trade :8081 already running
+# WeChat DevTools: disable domain check + disable TLS certificate check
 
 $ErrorActionPreference = "Stop"
+
 $ip = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object {
   $_.IPAddress -notlike '127.*' `
     -and $_.IPAddress -notlike '169.254.*' `
@@ -20,34 +19,75 @@ $ip = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object {
 
 if (-not $ip) { $ip = "127.0.0.1" }
 
-Write-Host "本机 IP: $ip" -ForegroundColor Cyan
-Write-Host "HTTPS 代理：" -ForegroundColor Green
-Write-Host "  https://${ip}:8443  ->  http://127.0.0.1:8000  (Python API + 静态资源)"
-Write-Host "  https://${ip}:8444  ->  http://127.0.0.1:8081  (Java 订单/会员)"
+Write-Host "LAN IP: $ip" -ForegroundColor Cyan
+Write-Host "HTTPS proxy:" -ForegroundColor Green
+Write-Host "  https://${ip}:8443  ->  http://127.0.0.1:8000  (Python API)"
+Write-Host "  https://${ip}:8444  ->  http://127.0.0.1:8081  (Java trade)"
 Write-Host ""
-Write-Host "请在 .env.development 中设置：" -ForegroundColor Yellow
+Write-Host ".env.development (simulator):" -ForegroundColor Yellow
+Write-Host "  VITE_API_BASE=https://127.0.0.1:8443/api/v1"
+Write-Host "  VITE_MEDIA_ORIGIN=https://127.0.0.1:8443"
+Write-Host "  VITE_TRADE_API_BASE=https://127.0.0.1:8444/api/v1"
+Write-Host ""
+Write-Host ".env.development (real device on phone):" -ForegroundColor Yellow
 Write-Host "  VITE_API_BASE=https://${ip}:8443/api/v1"
 Write-Host "  VITE_MEDIA_ORIGIN=https://${ip}:8443"
 Write-Host "  VITE_TRADE_API_BASE=https://${ip}:8444/api/v1"
 Write-Host ""
 
-$job1 = Start-Job -ScriptBlock {
-  param($hostName)
-  npx --yes local-ssl-proxy --source 8443 --target 8000 --hostname $hostName 2>&1
-} -ArgumentList $ip
+$port8443 = Get-NetTCPConnection -LocalPort 8443 -State Listen -ErrorAction SilentlyContinue
+if ($port8443) {
+  Write-Host "[OK] Port 8443 already in use (proxy running). Keep this window open or Ctrl+C to stop." -ForegroundColor Green
+  Write-Host "  WeChat DevTools: Settings -> Proxy -> NO PROXY" -ForegroundColor Cyan
+  try {
+    while ($true) { Start-Sleep -Seconds 60 }
+  } finally {
+    exit 0
+  }
+}
 
-$job2 = Start-Job -ScriptBlock {
-  param($hostName)
-  npx --yes local-ssl-proxy --source 8444 --target 8081 --hostname $hostName 2>&1
-} -ArgumentList $ip
+$npx = if (Test-Path "C:\Program Files\nodejs\npx.cmd") {
+  "C:\Program Files\nodejs\npx.cmd"
+} else {
+  (Get-Command npx.cmd -ErrorAction SilentlyContinue).Source
+}
+if (-not $npx) {
+  Write-Host "[FAIL] npx.cmd not found. Install Node.js first." -ForegroundColor Red
+  exit 1
+}
 
-Write-Host "HTTPS 代理已启动（Ctrl+C 停止）..." -ForegroundColor Green
+$certDir = Join-Path (Split-Path $PSScriptRoot -Parent) ".local-certs"
+$certFile = Join-Path $certDir "cert.pem"
+$keyFile = Join-Path $certDir "key.pem"
+$certArgs = @()
+if ((Test-Path $certFile) -and (Test-Path $keyFile)) {
+  Write-Host "[OK] Using mkcert certs from .local-certs" -ForegroundColor Green
+  $certArgs = @("--cert", $certFile, "--key", $keyFile)
+} else {
+  Write-Host "[WARN] No mkcert certs. Real device may show ERR_CERT_AUTHORITY_INVALID." -ForegroundColor Yellow
+  Write-Host "       Run setup-mkcert.bat OR use start-mp-simulator.bat on PC simulator." -ForegroundColor Yellow
+}
+
+$job1 = Start-Process -FilePath $npx -ArgumentList @(
+  "--yes", "local-ssl-proxy", "--source", "8443", "--target", "8000", "--hostname", "0.0.0.0"
+) + $certArgs -PassThru -WindowStyle Hidden
+Start-Sleep -Seconds 2
+$job2 = Start-Process -FilePath $npx -ArgumentList @(
+  "--yes", "local-ssl-proxy", "--source", "8444", "--target", "8081", "--hostname", "0.0.0.0"
+) + $certArgs -PassThru -WindowStyle Hidden
+
+Write-Host "HTTPS proxy started (Ctrl+C to stop)..." -ForegroundColor Green
+Write-Host "  PID api=$($job1.Id) trade=$($job2.Id)" -ForegroundColor DarkGray
+
 try {
   while ($true) {
-    Receive-Job $job1, $job2 -ErrorAction SilentlyContinue | Write-Host
-    Start-Sleep -Seconds 2
+    if ($job1.HasExited -or $job2.HasExited) {
+      Write-Host "[WARN] Proxy process exited. Check ports 8000 and 8081." -ForegroundColor Yellow
+      break
+    }
+    Start-Sleep -Seconds 3
   }
 } finally {
-  Stop-Job $job1, $job2 -ErrorAction SilentlyContinue
-  Remove-Job $job1, $job2 -ErrorAction SilentlyContinue
+  if (-not $job1.HasExited) { Stop-Process -Id $job1.Id -Force -ErrorAction SilentlyContinue }
+  if (-not $job2.HasExited) { Stop-Process -Id $job2.Id -Force -ErrorAction SilentlyContinue }
 }

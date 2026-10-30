@@ -28,4 +28,5 @@ onMounted(load)
 .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
 .empty { color: var(--color-text-secondary); text-align: center; padding: 60px 0; }
 @media (max-width: 1023px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 767px) { .grid { grid-template-columns: 1fr; } }
 </style>
